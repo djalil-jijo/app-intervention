@@ -1,0 +1,365 @@
+// Prisma Schema for IT-Tasker Enterprise ERP System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. الهيكل التنظيمي المعتمد
+enum UnitType {
+  FILIALE // مديرية جهوية
+  CIC     // مديرية ولائية
+  UPC     // وحدة إنتاجية
+
+  @@map("unit_type")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  URGENT
+  CRITICAL
+
+  @@map("ticket_priority")
+}
+
+enum TicketStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+
+  @@map("ticket_status")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  TECHNICIAN_LEAD
+  VIEWER
+
+  @@map("admin_role")
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  DONE
+  OVERDUE
+  CANCELLED
+
+  @@map("maintenance_status")
+}
+
+// التقنيون وفريق الإعلام الآلي
+model Technician {
+  id           String               @id @default(cuid()) @db.VarChar(36)
+  name         String               @db.VarChar(100)
+  email        String               @unique @db.VarChar(100)
+  phone        String?              @db.VarChar(20)
+  speciality   String               @default("Généraliste") @db.VarChar(600) // Réseau, Hardware, Système, etc.
+  role         String               @default("Technicien en Informatique") @db.VarChar(600)
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  tickets              InterventionTicket[]
+  maintenanceSchedules MaintenanceSchedule[]
+
+  @@map("technicians")
+}
+
+// جرد العتاد المعلوماتي (IT Assets Inventory)
+model ITAsset {
+  id           String               @id @default(cuid()) @db.VarChar(36)
+  assetTag     String               @unique @map("asset_tag") @db.VarChar(50) // Code à barres / الرقم الجردي
+  name         String               @db.VarChar(100) // e.g. "PC HP ProDesk 400"
+  type         String               @default("DESKTOP") @db.VarChar(50)       // DESKTOP, LAPTOP, SERVER, PRINTER, SWITCH_ROUTER, UPS, MONITOR
+  brand        String?              @db.VarChar(50)  // HP, Dell, Canon, Cisco
+  model        String?              @db.VarChar(50)
+  serialNumber String?              @map("serial_number") @db.VarChar(100)
+  
+  unitType     UnitType             @default(FILIALE) @map("unit_type")
+  unitName     String               @map("unit_name") @db.VarChar(150)
+  service      String?              @db.VarChar(100)
+  assignedTo   String?              @map("assigned_to") @db.VarChar(100)
+  ipAddress    String?              @map("ip_address") @db.VarChar(45)
+  
+  status       String               @default("OPERATIONAL") @db.VarChar(50)   // OPERATIONAL, DEFECTIVE, UNDER_MAINTENANCE, SCRAPPED
+  purchaseDate DateTime?            @map("purchase_date") @db.Date
+  warrantyEnd  DateTime?            @map("warranty_end") @db.Date
+  notes        String?              @db.Text
+  
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  tickets              InterventionTicket[]
+  maintenanceSchedules MaintenanceSchedule[]
+  dechargeItems        DechargeItem[]
+
+  @@index([assetTag], map: "idx_assets_tag")
+  @@index([status], map: "idx_assets_status")
+  @@index([unitName], map: "idx_assets_unit_name")
+  @@map("it_assets")
+}
+
+// مخزون قطع الغيار والمستهلكات (Spare Parts Stock)
+model SparePart {
+  id           String          @id @default(cuid()) @db.VarChar(36)
+  name         String          @db.VarChar(150) // e.g. "Disque SSD 512GB NVMe", "Toner Canon 054 Black"
+  partNumber   String?         @map("part_number") @db.VarChar(100)
+  category     String          @default("Consommables") @db.VarChar(100) // Stockage, RAM, Toners, Câbles, Composants
+  quantity     Int             @default(0)
+  minThreshold Int             @default(5) @map("min_threshold")
+  unitPrice    Float           @default(0.0) @map("unit_price")
+  location     String?         @db.VarChar(100) // Magasin A, Armoire 2
+  
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  movements    StockMovement[]
+
+  @@map("spare_parts")
+}
+
+// سجل حركة قطع الغيار (Stock Movements)
+model StockMovement {
+  id           String    @id @default(cuid()) @db.VarChar(36)
+  sparePartId  String    @map("spare_part_id") @db.VarChar(36)
+  movementType String    @map("movement_type") @db.VarChar(10) // IN, OUT
+  quantity     Int
+  reason       String?   @db.VarChar(200)
+  ticketId     String?   @map("ticket_id") @db.VarChar(36)
+  performedBy  String?   @map("performed_by") @db.VarChar(100)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sparePart    SparePart           @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  ticket       InterventionTicket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@map("stock_movements")
+}
+
+// قاعدة المعارف والحلول التقنية (Knowledge Base)
+model KnowledgeArticle {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  title        String   @db.VarChar(200)
+  category     String   @db.VarChar(100) // Réseau, Système, Imprimante, Logiciel
+  problem      String   @db.Text
+  solution     String   @db.Text
+  tags         String?  @db.VarChar(200)
+  views        Int      @default(0)
+  author       String   @default("Équipe IT") @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("knowledge_articles")
+}
+
+// تذاكر التدخل (Intervention Tickets)
+model InterventionTicket {
+  id               String              @id @default(cuid()) @db.VarChar(36)
+  ticketNumber     String              @unique @map("ticket_number") @db.VarChar(50)
+  
+  // بيانات صاحب الطلب
+  fullName         String              @map("full_name") @db.VarChar(100)
+  functionTitle    String?             @map("function_title") @db.VarChar(100)
+  service          String              @db.VarChar(100)
+  phone            String?             @db.VarChar(20)
+  email            String?             @db.VarChar(100)
+  managerName      String?             @map("manager_name") @db.VarChar(100)
+
+  // الهيكل التنظيمي للفروع
+  unitType         UnitType            @default(FILIALE) @map("unit_type")
+  unitName         String              @map("unit_name") @db.VarChar(150)
+
+  // بيانات العتاد والمشكلة
+  category         String              @default("Matériel informatique") @db.VarChar(100)
+  equipment        String              @db.VarChar(150)
+  ipAddress        String?             @map("ip_address") @db.VarChar(45)
+  serialNumber     String?             @map("serial_number") @db.VarChar(100)
+  priority         Priority            @default(MEDIUM)
+  description      String              @db.Text
+  interventionType String              @default("CURATIVE") @map("intervention_type") @db.VarChar(50) // CURATIVE, PREVENTIVE, INSTALLATION
+  
+  status           TicketStatus        @default(PENDING)
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // العلاقات بالعتاد والتقني المسؤول
+  assetId          String?             @map("asset_id") @db.VarChar(36)
+  asset            ITAsset?            @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  technicianId     String?             @map("technician_id") @db.VarChar(36)
+  technician       Technician?         @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  
+  report           InterventionReport?
+  stockMovements   StockMovement[]
+  comments         TicketComment[]
+
+  @@index([createdAt(sort: Desc)], map: "idx_tickets_created_at")
+  @@index([priority], map: "idx_tickets_priority")
+  @@index([unitType], map: "idx_tickets_unit_type")
+  @@index([unitName], map: "idx_tickets_unit_name")
+  @@index([status], map: "idx_tickets_status")
+  @@map("intervention_tickets")
+}
+
+// محاضر التدخل (Intervention Reports)
+model InterventionReport {
+  id              String             @id @default(cuid()) @db.VarChar(36)
+  reportNumber    String             @unique @map("report_number") @db.VarChar(50)
+  ticketId        String             @unique @map("ticket_id") @db.VarChar(36)
+  
+  technicianName  String             @map("technician_name") @db.VarChar(100)
+  diagnosis       String             @db.Text
+  actionsTaken    String             @map("actions_taken") @db.Text
+  partsReplaced   String?            @map("parts_replaced") @db.Text
+  durationMinutes Int                @default(60) @map("duration_minutes")
+  finalStatus     String             @default("Résolu & Opérationnel") @map("final_status") @db.VarChar(100)
+  completedAt     DateTime           @default(now()) @map("completed_at") @db.Timestamptz(6)
+  
+  ticket          InterventionTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ticket")
+
+  @@map("intervention_reports")
+}
+
+// تعليقات التذاكر وسجل الأنشطة (Ticket Comments / Activity Log)
+model TicketComment {
+  id        String             @id @default(cuid()) @db.VarChar(36)
+  ticketId  String             @map("ticket_id") @db.VarChar(36)
+  author    String             @db.VarChar(100)
+  content   String             @db.Text
+  isSystem  Boolean            @default(false) @map("is_system") // تعليقات النظام التلقائية
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket    InterventionTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId], map: "idx_comments_ticket_id")
+  @@map("ticket_comments")
+}
+
+// جدولة الصيانة الوقائية (Preventive Maintenance)
+model MaintenanceSchedule {
+  id            String            @id @default(cuid()) @db.VarChar(36)
+  title         String            @db.VarChar(200)
+  description   String?           @db.Text
+  assetId       String?           @map("asset_id") @db.VarChar(36)
+  technicianId  String?           @map("technician_id") @db.VarChar(36)
+  scheduledDate DateTime          @map("scheduled_date") @db.Timestamptz(6)
+  intervalDays  Int?              @map("interval_days") // null = non-recurrent
+  status        MaintenanceStatus @default(SCHEDULED)
+  priority      Priority          @default(MEDIUM)
+  notes         String?           @db.Text
+  completedAt   DateTime?         @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  asset         ITAsset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  technician    Technician?       @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  @@index([scheduledDate], map: "idx_maintenance_date")
+  @@index([status], map: "idx_maintenance_status")
+  @@map("maintenance_schedules")
+}
+
+// إدارة المستخدمين والأدوار (Admin Users)
+model AdminUser {
+  id           String    @id @default(cuid()) @db.VarChar(36)
+  username     String    @unique @db.VarChar(50)
+  email        String    @unique @db.VarChar(100)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  fullName     String    @map("full_name") @db.VarChar(100)
+  role         AdminRole @default(ADMIN)
+  active       Boolean   @default(true)
+  lastLogin    DateTime? @map("last_login") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([role], map: "idx_admin_users_role")
+  @@map("admin_users")
+}
+
+// قوالب التدخل (Intervention Templates)
+model InterventionTemplate {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  name        String   @db.VarChar(150)
+  category    String   @db.VarChar(100)
+  equipment   String   @db.VarChar(150)
+  description String   @db.Text
+  priority    Priority @default(MEDIUM)
+  solution    String?  @db.Text // الحل المقترح من قاعدة المعارف
+  usageCount  Int      @default(0) @map("usage_count")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("intervention_templates")
+}
+
+// سندات ومحاضر تسليم العتاد للمستخدمين (Bons de Décharge de Matériel)
+model EquipmentDecharge {
+  id                 String         @id @default(cuid()) @db.VarChar(36)
+  dechargeNumber     String         @unique @map("decharge_number") @db.VarChar(50) // DCH-2026-0001
+  
+  // بيانات المستفيد
+  beneficiaryName    String         @map("beneficiary_name") @db.VarChar(100)
+  functionTitle      String?        @map("function_title") @db.VarChar(100)
+  department         String         @db.VarChar(100) // Service / Direction
+  matricule          String?        @db.VarChar(50)  // N° de matricule / N° CIN
+  phone              String?        @db.VarChar(30)
+  email              String?        @db.VarChar(100)
+
+  // الهيكل والموقع
+  unitType           UnitType       @default(FILIALE) @map("unit_type")
+  unitName           String         @map("unit_name") @db.VarChar(150)
+
+  // تفاصيل التسليم
+  dischargeType      String         @default("PERMANENT") @map("discharge_type") @db.VarChar(30) // PERMANENT (نهائي), TEMPORARY (إعارة مؤقتة)
+  dischargeDate      DateTime       @default(now()) @map("discharge_date") @db.Timestamptz(6)
+  expectedReturnDate DateTime?      @map("expected_return_date") @db.Date
+  technicianName     String         @map("technician_name") @db.VarChar(100)
+  notes              String?        @db.Text
+  status             String         @default("ACTIVE") @db.VarChar(30) // ACTIVE (مسلّم قيد الاستعمال), RETURNED (مسترجع), CANCELLED (ملغى)
+
+  // تفاصيل الاسترجاع
+  returnedAt         DateTime?      @map("returned_at") @db.Timestamptz(6)
+  returnNotes        String?        @map("return_notes") @db.Text
+
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items              DechargeItem[]
+
+  @@index([dechargeNumber], map: "idx_decharges_number")
+  @@index([status], map: "idx_decharges_status")
+  @@index([beneficiaryName], map: "idx_decharges_beneficiary")
+  @@index([unitName], map: "idx_decharges_unit_name")
+  @@map("equipment_decharges")
+}
+
+// عناصر العتاد الملحقة بوصل التسليم (Decharge Items)
+model DechargeItem {
+  id            String            @id @default(cuid()) @db.VarChar(36)
+  dechargeId    String            @map("decharge_id") @db.VarChar(36)
+  assetId       String?           @map("asset_id") @db.VarChar(36)
+  
+  assetTag      String?           @map("asset_tag") @db.VarChar(50)
+  equipmentName String            @map("equipment_name") @db.VarChar(150)
+  category      String            @default("DESKTOP") @db.VarChar(50)
+  brand         String?           @db.VarChar(50)
+  model         String?           @db.VarChar(50)
+  serialNumber  String?           @map("serial_number") @db.VarChar(100)
+  condition     String            @default("BON_ETAT") @db.VarChar(50) // NEUF, BON_ETAT, ETAT_MOYEN
+  accessories   String?           @db.VarChar(255) // Sacoche, Câble HDMI, Souris, Chargeur...
+
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  decharge      EquipmentDecharge @relation(fields: [dechargeId], references: [id], onDelete: Cascade)
+  asset         ITAsset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@index([dechargeId], map: "idx_decharge_items_decharge_id")
+  @@index([assetId], map: "idx_decharge_items_asset_id")
+  @@map("decharge_items")
+}
