@@ -14,21 +14,48 @@ export async function GET(
 
     const ticket = await prisma.interventionTicket.findUnique({
       where: { id },
-      include: { report: true },
+      include: {
+        report: true,
+        employee: true,
+        technician: true,
+      },
     });
 
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket introuvable.' }, { status: 404 });
     }
 
+    const resolvedEmployeeSignature = ticket.employeeSignature || ticket.employee?.signature || null;
+    const resolvedEmployeeStamp = ticket.employeeStamp || ticket.employee?.stamp || null;
+    const resolvedTechnicianSignature = ticket.technicianSignature || ticket.technician?.signature || null;
+    const resolvedTechnicianStamp = ticket.technicianStamp || ticket.technician?.stamp || null;
+
     let pdfBuffer: Buffer;
     let filename: string;
 
     if (ticket.report && !forceTicketOnly) {
-      pdfBuffer = await renderReportPDFToBuffer(ticket, ticket.report);
+      pdfBuffer = await renderReportPDFToBuffer(
+        {
+          ...ticket,
+          employeeSignature: resolvedEmployeeSignature,
+          employeeStamp: resolvedEmployeeStamp,
+        },
+        {
+          ...ticket.report,
+          technicianSignature: ticket.report.technicianSignature || resolvedTechnicianSignature,
+          technicianStamp: ticket.report.technicianStamp || resolvedTechnicianStamp,
+          clientSignature: ticket.report.clientSignature || resolvedEmployeeSignature,
+        }
+      );
       filename = `Fiche_Intervention_${ticket.report.reportNumber}_${ticket.ticketNumber}.pdf`;
     } else {
-      pdfBuffer = await renderTicketPDFToBuffer(ticket);
+      pdfBuffer = await renderTicketPDFToBuffer({
+        ...ticket,
+        employeeSignature: resolvedEmployeeSignature,
+        employeeStamp: resolvedEmployeeStamp,
+        technicianSignature: resolvedTechnicianSignature,
+        technicianStamp: resolvedTechnicianStamp,
+      });
       filename = `Demande_Intervention_${ticket.ticketNumber}.pdf`;
     }
 

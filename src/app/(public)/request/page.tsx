@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -9,12 +10,17 @@ import {
   TICKET_CATEGORIES,
 } from '@/lib/validations';
 import { createTicketAction } from '@/app/actions/tickets';
+import { getCurrentUserAction } from '@/app/actions/auth';
+import { SignaturePadModal } from '@/components/ui/SignaturePadModal';
+import { StampStudioModal } from '@/components/ui/StampStudioModal';
+import { SessionUser } from '@/lib/auth';
 import {
   Send, Loader2, CheckCircle2, AlertCircle,
   Building2, User, Monitor, Network, FileText,
   AlertTriangle, Barcode, Phone, Mail, Briefcase,
   Tag, UserCheck, Download, Printer, MapPin, Factory,
-  Sparkles, ShieldCheck, ArrowRight, Zap, Check
+  Sparkles, ShieldCheck, ArrowRight, Zap, Check,
+  PenTool, Award, Eye
 } from 'lucide-react';
 
 const UNIT_TYPE_OPTIONS = [
@@ -75,9 +81,16 @@ const PRIORITY_OPTIONS = [
 ] as const;
 
 export default function RequestPage() {
+  const [currentUser,     setCurrentUser]     = useState<SessionUser | null>(null);
   const [isSubmitting,    setIsSubmitting]    = useState(false);
   const [errorMsg,        setErrorMsg]        = useState<string | null>(null);
   const [submittedTicket, setSubmittedTicket] = useState<{ id: string; number: string } | null>(null);
+
+  // Digital Signature & Stamp
+  const [employeeSignature, setEmployeeSignature] = useState<string | null>(null);
+  const [employeeStamp,     setEmployeeStamp]     = useState<string | null>(null);
+  const [isSigModalOpen,    setIsSigModalOpen]    = useState(false);
+  const [isStampModalOpen,  setIsStampModalOpen]  = useState(false);
 
   const {
     register,
@@ -106,6 +119,26 @@ export default function RequestPage() {
     },
   });
 
+  // Pre-fill user data if logged in
+  useEffect(() => {
+    async function loadUser() {
+      const u = await getCurrentUserAction();
+      if (u) {
+        setCurrentUser(u);
+        if (u.name) setValue('fullName', u.name);
+        if (u.functionTitle) setValue('functionTitle', u.functionTitle);
+        if (u.service) setValue('service', u.service);
+        if (u.phone) setValue('phone', u.phone);
+        if (u.email) setValue('email', u.email);
+        if (u.unitType) setValue('unitType', u.unitType as any);
+        if (u.unitName) setValue('unitName', u.unitName);
+        if (u.signature) setEmployeeSignature(u.signature);
+        if (u.stamp) setEmployeeStamp(u.stamp);
+      }
+    }
+    loadUser();
+  }, [setValue]);
+
   const selectedUnitType = watch('unitType');
   const selectedPriority = watch('priority');
   const currentUnitOpt   = UNIT_TYPE_OPTIONS.find((o) => o.value === selectedUnitType) ?? UNIT_TYPE_OPTIONS[0];
@@ -114,7 +147,13 @@ export default function RequestPage() {
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      const res = await createTicketAction(data);
+      const res = await createTicketAction({
+        ...data,
+        employeeId: currentUser?.employeeId || undefined,
+        employeeSignature: employeeSignature || null,
+        employeeStamp: employeeStamp || null,
+      });
+
       if (res.success && res.data) {
         setSubmittedTicket({ id: res.data.id, number: res.data.ticketNumber });
         reset();
@@ -142,15 +181,46 @@ export default function RequestPage() {
         <div className="relative z-10 space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" />
-            Nouveau Ticket d&apos;Assistance
+            Nouveau Ticket d&apos;Assistance Certifié
           </div>
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight flex items-center gap-3">
             <FileText className="w-8 h-8 text-sky-400 shrink-0" />
             Demande d&apos;Intervention Informatique
           </h1>
           <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Renseignez les détails du dysfonctionnement rencontré. Un ticket certifié sera généré et transmis immédiatement à l&apos;équipe IT Support.
+            Renseignez les détails du dysfonctionnement rencontré. Un ticket certifié avec votre visa, émargement et cachet sera transmis immédiatement à l&apos;équipe IT Support.
           </p>
+
+          {/* User authentication status card */}
+          {currentUser ? (
+            <div className="mt-4 p-3.5 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5 text-sky-300 font-bold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  مرحباً بك {currentUser.name}! تم استيراد بياناتك وسيتم إرفاق إمضائك وختمك المعتمدين تلقائياً بالطلب.
+                </span>
+              </div>
+              <Link
+                href="/profile"
+                className="shrink-0 px-3 py-1 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 text-[11px] font-extrabold transition-colors"
+              >
+                تعديل إمضائي / ختمي
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-4 p-3.5 rounded-2xl bg-navy-950/80 border border-navy-750 flex items-center justify-between gap-3 text-xs text-slate-300">
+              <span className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                هل لديك حساب موظف مسجل؟ سجّل دخولك لتعبئة بياناتك وإرفاق إمضائك وختمك تلقائياً!
+              </span>
+              <Link
+                href="/login"
+                className="shrink-0 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-bold text-[11px] shadow-md transition-transform hover:scale-105"
+              >
+                تسجيل الدخول
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
@@ -162,12 +232,12 @@ export default function RequestPage() {
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Confirmation d&apos;enregistrement</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Confirmation d&apos;enregistrement certifié</span>
               <h3 className="text-2xl font-extrabold text-emerald-200">
                 Demande Enregistrée avec Succès !
               </h3>
               <p className="text-sm text-slate-300">
-                Votre ticket d&apos;intervention certifié a été créé sous le numéro :
+                Votre ticket d&apos;intervention certifié avec signature et cachet a été créé sous le numéro :
               </p>
               <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-navy-950 border border-emerald-500/40 font-mono text-2xl font-black text-emerald-400 tracking-wider shadow-inner">
                 <ShieldCheck className="w-6 h-6 text-emerald-400" />
@@ -183,17 +253,15 @@ export default function RequestPage() {
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm shadow-xl shadow-emerald-950/50 transition-all hover:scale-[1.02]"
             >
               <Download className="w-4 h-4" />
-              <span>Télécharger Fiche PDF Certifiée</span>
+              <span>تحميل الاستمارة الموقعة والمختومة PDF</span>
             </a>
-            <a
-              href={`/api/tickets/${submittedTicket.id}/pdf?type=ticket&inline=true`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/track"
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-navy-800 hover:bg-navy-750 text-slate-100 font-bold text-sm border border-navy-600 transition-all"
             >
-              <Printer className="w-4 h-4 text-sky-400" />
-              <span>Aperçu & Imprimer</span>
-            </a>
+              <ArrowRight className="w-4 h-4 text-sky-400" />
+              <span>تتبع حالة الطلب فورياً</span>
+            </Link>
           </div>
 
           <div className="pt-2 border-t border-emerald-900/60 flex items-center justify-between text-xs">
@@ -201,7 +269,7 @@ export default function RequestPage() {
               onClick={() => setSubmittedTicket(null)}
               className="font-bold text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1.5"
             >
-              ← Soumettre une autre demande
+              ← تقديم طلب تدخل إضافي
             </button>
             <span className="text-slate-400 font-mono">Status: En Attente de Prise en Charge</span>
           </div>
@@ -251,105 +319,41 @@ export default function RequestPage() {
 
               <div>
                 <label className={labelCls}>
-                  <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                  <Briefcase className="w-3.5 h-3.5 text-sky-400" />
                   Fonction / Poste <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Responsable Commercial"
+                  placeholder="Ex: Chef de Département / Ingénieur"
                   {...register('functionTitle')}
                   className={inputCls}
                 />
               </div>
-            </div>
 
-            <div>
-              <label className={labelCls}>
-                Direction / Service <span className="text-rose-400 ml-0.5">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Service Comptabilité & Finance"
-                {...register('service')}
-                className={inputCls}
-              />
-              {errors.service && (
-                <p className="text-xs text-rose-400 mt-1 font-medium">{errors.service.message}</p>
-              )}
-            </div>
-
-            {/* ── Org Hierarchy: UnitType + UnitName ── */}
-            <div className="bg-navy-950/80 border border-navy-800 rounded-2xl p-5 space-y-5">
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-sky-400" />
-                Entité de Rattachement <span className="text-rose-400 ml-0.5">*</span>
-              </h3>
-
-              {/* UnitType selector cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {UNIT_TYPE_OPTIONS.map(({ value, label, desc, icon: Icon, color, selectedBg }) => {
-                  const isSelected = selectedUnitType === value;
-                  return (
-                    <button
-                      type="button"
-                      key={value}
-                      onClick={() => setValue('unitType', value as any)}
-                      className={`
-                        relative flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all duration-200 cursor-pointer
-                        ${isSelected
-                          ? selectedBg
-                          : 'bg-navy-900 border-navy-750 text-slate-400 hover:border-navy-600 hover:text-slate-200'
-                        }
-                      `}
-                    >
-                      <Icon className={`w-6 h-6 mb-2 ${isSelected ? color : 'text-slate-500'}`} />
-                      <span className={`text-xs font-extrabold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                        {label}
-                      </span>
-                      <span className={`text-[11px] mt-0.5 ${isSelected ? 'text-slate-200' : 'text-slate-500'}`}>
-                        {desc}
-                      </span>
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-sky-500 text-slate-950 flex items-center justify-center">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.unitType && (
-                <p className="text-xs text-rose-400 font-medium">{errors.unitType.message}</p>
-              )}
-
-              {/* UnitName */}
               <div>
                 <label className={labelCls}>
-                  <currentUnitOpt.icon className={`w-3.5 h-3.5 ${currentUnitOpt.color}`} />
-                  Nom de l&apos;entité — {currentUnitOpt.label}{' '}
-                  <span className="text-rose-400 ml-0.5">*</span>
+                  <Building2 className="w-3.5 h-3.5 text-sky-400" />
+                  Service / Direction <span className="text-rose-400 ml-0.5">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder={currentUnitOpt.placeholder}
-                  {...register('unitName')}
+                  placeholder="Ex: Direction des Finances, RH, Production..."
+                  {...register('service')}
                   className={inputCls}
                 />
-                {errors.unitName && (
-                  <p className="text-xs text-rose-400 mt-1 font-medium">{errors.unitName.message}</p>
+                {errors.service && (
+                  <p className="text-xs text-rose-400 mt-1 font-medium">{errors.service.message}</p>
                 )}
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className={labelCls}>
                   <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  Téléphone <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
+                  Téléphone / N° Poste <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
                 </label>
                 <input
                   type="tel"
-                  placeholder="Ex: 0555 12 34 56"
+                  placeholder="Ex: 0550 12 34 56 / Poste 204"
                   {...register('phone')}
                   className={inputCls}
                 />
@@ -358,7 +362,7 @@ export default function RequestPage() {
               <div>
                 <label className={labelCls}>
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  Email <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
+                  Adresse Email <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
                 </label>
                 <input
                   type="email"
@@ -370,30 +374,79 @@ export default function RequestPage() {
                   <p className="text-xs text-rose-400 mt-1 font-medium">{errors.email.message}</p>
                 )}
               </div>
+
+              <div>
+                <label className={labelCls}>
+                  <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                  Responsable Hiérarchique <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: M. Hadj Ahmed"
+                  {...register('managerName')}
+                  className={inputCls}
+                />
+              </div>
             </div>
 
-            <div>
+            {/* Structure / Entité Selector */}
+            <div className="space-y-3 pt-2">
               <label className={labelCls}>
-                <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                Nom du Responsable Hiérarchique <span className="text-slate-500 font-normal lowercase">(optionnel)</span>
+                <Building2 className="w-3.5 h-3.5 text-sky-400" />
+                Type de Structure / Entité <span className="text-rose-400 ml-0.5">*</span>
               </label>
-              <input
-                type="text"
-                placeholder="Ex: M. Ahmed Khelifi — Chef de Service"
-                {...register('managerName')}
-                className={inputCls}
-              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {UNIT_TYPE_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const isSelected = selectedUnitType === opt.value;
+                  return (
+                    <button
+                      type="button"
+                      key={opt.value}
+                      onClick={() => setValue('unitType', opt.value as any)}
+                      className={`
+                        p-4 rounded-2xl border text-left flex items-start gap-3 transition-all duration-200 cursor-pointer
+                        ${isSelected
+                          ? `${opt.selectedBg} ring-2 ring-sky-400/40 scale-[1.02]`
+                          : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:bg-navy-850 hover:text-slate-200'
+                        }
+                      `}
+                    >
+                      <div className={`p-2 rounded-xl ${isSelected ? 'bg-white/10' : 'bg-navy-800'}`}>
+                        <Icon className={`w-5 h-5 ${opt.color}`} />
+                      </div>
+                      <div>
+                        <p className="font-extrabold text-sm text-white">{opt.label}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{opt.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3">
+                <input
+                  type="text"
+                  placeholder={currentUnitOpt.placeholder}
+                  {...register('unitName')}
+                  className={inputCls}
+                />
+                {errors.unitName && (
+                  <p className="text-xs text-rose-400 mt-1 font-medium">{errors.unitName.message}</p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* ── Section 2: Équipement & Priorité ── */}
+          {/* ── Section 2: Matériel & Incident ── */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 border-b border-navy-800 pb-3">
               <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-400 font-bold text-sm flex items-center justify-center">
                 2
               </div>
               <h2 className="text-base font-extrabold uppercase tracking-wider text-white">
-                Équipement & Priorité
+                Détails du Matériel &amp; Degré d&apos;Urgence
               </h2>
             </div>
 
@@ -515,6 +568,88 @@ export default function RequestPage() {
             </div>
           </div>
 
+          {/* ── Section 4: Signature & Stamp (الإمضاء والختم الرقمي المعتمد) ── */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-navy-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 font-bold text-sm flex items-center justify-center">
+                  4
+                </div>
+                <h2 className="text-base font-extrabold uppercase tracking-wider text-white">
+                  التأشيرة والإمضاء والختم الرقمي المعتمد
+                </h2>
+              </div>
+              <span className="text-xs text-sky-400 font-bold flex items-center gap-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                يوضعان تلقائياً في وثيقة PDF الرسمية
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Employee Signature Card */}
+              <div className="p-4 rounded-2xl bg-navy-950/90 border border-navy-800 flex flex-col justify-between gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <PenTool className="w-3.5 h-3.5 text-sky-400" />
+                    توقيع طالب التدخل
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSigModalOpen(true)}
+                    className="px-2.5 py-1 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[11px] font-bold transition-colors"
+                  >
+                    {employeeSignature ? 'تغيير التوقيع' : 'رسم / رفع التوقيع'}
+                  </button>
+                </div>
+
+                <div className="w-full h-24 rounded-xl bg-white p-2 flex items-center justify-center border border-slate-300 shadow-inner relative overflow-hidden">
+                  {employeeSignature ? (
+                    <img src={employeeSignature} alt="Signature" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <div className="text-center text-slate-400 space-y-1">
+                      <PenTool className="w-5 h-5 mx-auto opacity-40" />
+                      <p className="text-[10px]">انقر على الزر لرسم أو استيراد توقيعك</p>
+                    </div>
+                  )}
+                  <span className="absolute bottom-1 right-2 text-[8px] text-slate-400 font-mono select-none">
+                    Visa Demandeur
+                  </span>
+                </div>
+              </div>
+
+              {/* Employee Stamp Card */}
+              <div className="p-4 rounded-2xl bg-navy-950/90 border border-navy-800 flex flex-col justify-between gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-indigo-400" />
+                    الختم الرسمي للمصلحة
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsStampModalOpen(true)}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-[11px] font-bold transition-colors"
+                  >
+                    {employeeStamp ? 'تغيير الختم' : 'توليد / رفع الختم'}
+                  </button>
+                </div>
+
+                <div className="w-full h-24 rounded-xl bg-white p-2 flex items-center justify-center border border-slate-300 shadow-inner relative overflow-hidden">
+                  {employeeStamp ? (
+                    <img src={employeeStamp} alt="Official Stamp" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <div className="text-center text-slate-400 space-y-1">
+                      <Award className="w-5 h-5 mx-auto opacity-40" />
+                      <p className="text-[10px]">انقر لتوليد ختم دائري رسمي أو رفع صورة الختم</p>
+                    </div>
+                  )}
+                  <span className="absolute bottom-1 right-2 text-[8px] text-slate-400 font-mono select-none">
+                    Cachet Direction
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* ── Submit CTA ── */}
           <div className="pt-4 flex items-center justify-end border-t border-navy-800">
             <button
@@ -537,6 +672,23 @@ export default function RequestPage() {
           </div>
         </form>
       )}
+
+      {/* Signature and Stamp Modals */}
+      <SignaturePadModal
+        isOpen={isSigModalOpen}
+        onClose={() => setIsSigModalOpen(false)}
+        onSave={(sig) => setEmployeeSignature(sig)}
+        initialSignature={employeeSignature}
+      />
+      <StampStudioModal
+        isOpen={isStampModalOpen}
+        onClose={() => setIsStampModalOpen(false)}
+        onSave={(st) => setEmployeeStamp(st)}
+        initialStamp={employeeStamp}
+        defaultOrgName={watch('unitName') || 'ENTREPRISE INDUSTRIELLE'}
+        defaultServiceName={watch('service') || 'DIRECTION FINANCES'}
+        defaultUserName={watch('fullName') || 'DEMANDEUR'}
+      />
     </div>
   );
 }

@@ -309,17 +309,131 @@ export async function seedErpDemoDataAction() {
       });
     }
 
-    revalidatePath('/admin/dashboard');
-    revalidatePath('/admin/tickets');
-    revalidatePath('/admin/maintenance');
-    revalidatePath('/admin/assets');
-    revalidatePath('/admin/decharges');
-    revalidatePath('/admin/stock');
-    revalidatePath('/admin/reports');
-    revalidatePath('/admin/technicians');
-    revalidatePath('/admin/knowledge');
-    revalidatePath('/admin/templates');
-    revalidatePath('/admin/users');
+    // 9. Seed Employees with Digital Signatures & Stamps
+    const employeeCount = await prisma.employee.count();
+    const demoEmpPassHash = await bcrypt.hash('Emp2026!', 10);
+    const demoTechPassHash = await bcrypt.hash('Tech2026!', 10);
+    const demoAdminPassHash = await bcrypt.hash('Admin2026!', 10);
+
+    const sampleEmployeeSig = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="70" viewBox="0 0 200 70"><path d="M20,45 Q40,15 70,35 T130,25 Q160,10 180,40 M60,40 Q90,55 140,45" fill="none" stroke="%230f172a" stroke-width="2.5" stroke-linecap="round"/></svg>';
+    const sampleEmployeeStamp = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140"><circle cx="70" cy="70" r="64" fill="none" stroke="%231d4ed8" stroke-width="3"/><circle cx="70" cy="70" r="58" fill="none" stroke="%231d4ed8" stroke-width="1"/><circle cx="70" cy="70" r="38" fill="none" stroke="%231d4ed8" stroke-width="1.5"/><text x="70" y="24" font-size="7" font-weight="bold" fill="%231d4ed8" text-anchor="middle">FILIALE ANNABA</text><text x="70" y="66" font-size="8" font-weight="bold" fill="%231d4ed8" text-anchor="middle">DIRECTION FINANCES</text><text x="70" y="80" font-size="7" font-weight="bold" fill="%231d4ed8" text-anchor="middle">VISA CONFORME</text><text x="70" y="124" font-size="7" font-weight="bold" fill="%231d4ed8" text-anchor="middle">IT-TASKER ERP</text></svg>';
+
+    const sampleTechSig = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="70" viewBox="0 0 200 70"><path d="M15,50 Q45,10 65,30 T110,40 Q150,15 185,35 M50,35 Q100,60 160,30" fill="none" stroke="%230369a1" stroke-width="2.5" stroke-linecap="round"/></svg>';
+    const sampleTechStamp = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140"><circle cx="70" cy="70" r="64" fill="none" stroke="%230369a1" stroke-width="3"/><circle cx="70" cy="70" r="58" fill="none" stroke="%230369a1" stroke-width="1"/><circle cx="70" cy="70" r="38" fill="none" stroke="%230369a1" stroke-width="1.5"/><text x="70" y="24" font-size="7" font-weight="bold" fill="%230369a1" text-anchor="middle">SUPPORT TECHNIQUE IT</text><text x="70" y="66" font-size="8" font-weight="bold" fill="%230369a1" text-anchor="middle">VALIDATION MAINTENANCE</text><text x="70" y="80" font-size="7" font-weight="bold" fill="%230369a1" text-anchor="middle">DSI INFORMATIQUE</text><text x="70" y="124" font-size="7" font-weight="bold" fill="%230369a1" text-anchor="middle">CERTIFIÉ CONFORME</text></svg>';
+
+    if (employeeCount === 0) {
+      await prisma.employee.createMany({
+        data: [
+          {
+            fullName: 'مراد بلقاسم',
+            email: 'employee@enterprise.com',
+            username: 'employee',
+            passwordHash: demoEmpPassHash,
+            phone: '0550 12 34 56',
+            functionTitle: 'Chef de Département Finances',
+            service: 'Direction des Finances & Comptabilité',
+            unitType: 'FILIALE',
+            unitName: 'Filiale Annaba',
+            managerName: 'Directeur Général Filiale',
+            signature: sampleEmployeeSig,
+            stamp: sampleEmployeeStamp,
+            active: true,
+          },
+          {
+            fullName: 'فاطمة الزهراء شريفي',
+            email: 'fatima.rh@enterprise.com',
+            username: 'fatima.rh',
+            passwordHash: demoEmpPassHash,
+            phone: '0661 44 55 66',
+            functionTitle: 'Responsable Ressources Humaines',
+            service: 'Direction des Ressources Humaines',
+            unitType: 'CIC',
+            unitName: 'CIC Constantine',
+            managerName: 'Directeur CIC',
+            signature: sampleEmployeeSig,
+            stamp: sampleEmployeeStamp,
+            active: true,
+          },
+        ],
+      });
+    }
+
+    // Ensure dedicated Technician account exists
+    const demoTech = await prisma.technician.findFirst({
+      where: {
+        OR: [
+          { email: 'technician@enterprise.com' },
+          { username: 'technician' },
+        ],
+      },
+    });
+
+    if (!demoTech) {
+      await prisma.technician.create({
+        data: {
+          name: 'كريم بن علي (تقني معتمد)',
+          email: 'technician@enterprise.com',
+          username: 'technician',
+          passwordHash: demoTechPassHash,
+          phone: '0550 99 88 77',
+          speciality: 'Maintenance Informatique, Réseaux Cisco & Systèmes',
+          role: 'Technicien Supérieur en Informatique',
+          signature: sampleTechSig,
+          stamp: sampleTechStamp,
+          active: true,
+        },
+      });
+    } else {
+      await prisma.technician.update({
+        where: { id: demoTech.id },
+        data: {
+          username: 'technician',
+          passwordHash: demoTechPassHash,
+          signature: demoTech.signature || sampleTechSig,
+          stamp: demoTech.stamp || sampleTechStamp,
+        },
+      });
+    }
+
+    // Ensure dedicated Admin account exists in AdminUser table
+    const demoAdmin = await prisma.adminUser.findFirst({
+      where: {
+        OR: [
+          { email: 'admin@enterprise.com' },
+          { username: 'admin' },
+        ],
+      },
+    });
+
+    if (!demoAdmin) {
+      await prisma.adminUser.create({
+        data: {
+          fullName: 'المشرف العام للنظام',
+          email: 'admin@enterprise.com',
+          username: 'admin',
+          passwordHash: demoAdminPassHash,
+          role: AdminRole.SUPER_ADMIN,
+          active: true,
+        },
+      });
+    }
+
+    try {
+      revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/tickets');
+      revalidatePath('/admin/maintenance');
+      revalidatePath('/admin/assets');
+      revalidatePath('/admin/decharges');
+      revalidatePath('/admin/stock');
+      revalidatePath('/admin/reports');
+      revalidatePath('/admin/technicians');
+      revalidatePath('/admin/employees');
+      revalidatePath('/admin/knowledge');
+      revalidatePath('/admin/templates');
+      revalidatePath('/admin/users');
+      revalidatePath('/track');
+      revalidatePath('/login');
+    } catch {}
 
     return { success: true };
   } catch (error: any) {

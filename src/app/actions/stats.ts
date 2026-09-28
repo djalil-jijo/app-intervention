@@ -99,12 +99,38 @@ export async function getDashboardStatsAction() {
         Date.now() - new Date(t.createdAt).getTime() > 48 * 60 * 60 * 1000,
     ).length;
 
+    // Tickets by intervention type
+    const byInterventionType = {
+      CURATIVE:     tickets.filter((t) => t.interventionType === 'CURATIVE').length,
+      PREVENTIVE:   tickets.filter((t) => t.interventionType === 'PREVENTIVE').length,
+      INSTALLATION: tickets.filter((t) => t.interventionType === 'INSTALLATION').length,
+    };
+
+    // SLA breach: tickets open > 48h without resolution
+    const activeTickets = tickets.filter((t) => t.status !== 'CLOSED');
+    const breachedSLA = activeTickets.filter(
+      (t) =>
+        (t.status === 'PENDING' || t.status === 'IN_PROGRESS') &&
+        Date.now() - new Date(t.createdAt).getTime() > 48 * 3600000,
+    ).length;
+    const slaBreachRate =
+      activeTickets.length > 0 ? Math.round((breachedSLA / activeTickets.length) * 100) : 0;
+
+    // Daily close rate (last 7 days)
+    const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const closedLast7 = tickets.filter(
+      (t) =>
+        (t.status === 'RESOLVED' || t.status === 'CLOSED') &&
+        new Date(t.updatedAt) >= last7Days,
+    ).length;
+
     return {
       success: true,
       data: {
         byStatus,
         byPriority,
         byUnitType,
+        byInterventionType,
         monthlyTrend,
         technicianStats,
         assetStats,
@@ -113,6 +139,8 @@ export async function getDashboardStatsAction() {
         avgResolutionHours,
         criticalPending,
         pendingNoTech,
+        slaBreachRate,
+        closedLast7Days: closedLast7,
         upcomingMaintenance: maintenanceSchedules,
         totalTickets: tickets.length,
         totalTechnicians: technicians.length,

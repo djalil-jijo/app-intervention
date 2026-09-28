@@ -33,13 +33,21 @@ async function generateReportNumber(): Promise<string> {
   return `${prefix}${paddedSeq}`;
 }
 
-export async function createReportAction(input: CreateReportInput & { durationMinutes?: number; usedSparePartId?: string; usedQuantity?: number }) {
+export async function createReportAction(input: CreateReportInput & {
+  durationMinutes?: number;
+  usedSparePartId?: string;
+  usedQuantity?: number;
+  technicianSignature?: string;
+  technicianStamp?: string;
+  clientSignature?: string;
+}) {
   try {
     const validated = createReportSchema.parse(input);
 
     // Fetch target ticket
     const ticket = await prisma.interventionTicket.findUnique({
       where: { id: validated.ticketId },
+      include: { technician: true, employee: true },
     });
 
     if (!ticket) {
@@ -73,7 +81,12 @@ export async function createReportAction(input: CreateReportInput & { durationMi
       }
     }
 
-    // Transaction: Create Report & set Ticket status to RESOLVED
+    // Resolve signatures and stamps
+    const finalTechSig = input.technicianSignature || ticket.technician?.signature || null;
+    const finalTechStamp = input.technicianStamp || ticket.technician?.stamp || null;
+    const finalClientSig = input.clientSignature || ticket.employeeSignature || ticket.employee?.signature || null;
+
+    // Transaction: Create Report & set Ticket status to RESOLVED with signatures
     const [report, updatedTicket] = await prisma.$transaction([
       prisma.interventionReport.create({
         data: {
@@ -85,11 +98,18 @@ export async function createReportAction(input: CreateReportInput & { durationMi
           partsReplaced: validated.partsReplaced || null,
           durationMinutes: input.durationMinutes || 60,
           finalStatus: validated.finalStatus,
+          technicianSignature: finalTechSig,
+          technicianStamp: finalTechStamp,
+          clientSignature: finalClientSig,
         },
       }),
       prisma.interventionTicket.update({
         where: { id: ticket.id },
-        data: { status: TicketStatus.RESOLVED },
+        data: {
+          status: TicketStatus.RESOLVED,
+          technicianSignature: finalTechSig,
+          technicianStamp: finalTechStamp,
+        },
       }),
     ]);
 

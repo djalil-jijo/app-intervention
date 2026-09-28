@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: {
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     borderRadius: 6,
     padding: 10,
-    height: 100,
+    height: 125,
     backgroundColor: '#FAFDFD',
   },
   signatureHeader: {
@@ -250,6 +250,10 @@ interface InterventionTicketPDFProps {
     description: string;
     status: string;
     createdAt: Date | string;
+    employeeSignature?: string | null;
+    employeeStamp?: string | null;
+    technicianSignature?: string | null;
+    technicianStamp?: string | null;
   };
 }
 
@@ -396,15 +400,31 @@ export const InterventionTicketPDF: React.FC<InterventionTicketPDFProps> = ({ ti
         <View style={styles.signatureSection}>
           <View style={styles.signatureGrid}>
             <View style={styles.signatureBox}>
-              <Text style={styles.signatureHeader}>Signature du Demandeur</Text>
+              <Text style={styles.signatureHeader}>Signature &amp; Cachet Demandeur</Text>
               <Text style={styles.signatureSub}>Nom: {ticket.fullName}</Text>
-              <Text style={styles.signatureFooterText}>Date & Emargement demandeur</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 75, marginTop: 4 }}>
+                {ticket.employeeSignature ? (
+                  <Image src={ticket.employeeSignature} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                ) : null}
+                {ticket.employeeStamp ? (
+                  <Image src={ticket.employeeStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                ) : null}
+              </View>
+              <Text style={styles.signatureFooterText}>Date &amp; Emargement demandeur</Text>
             </View>
 
             <View style={styles.signatureBox}>
               <Text style={styles.signatureHeader}>Réception Support IT</Text>
               <Text style={styles.signatureSub}>Prise en charge IT</Text>
-              <Text style={styles.signatureFooterText}>Date & Tampon Réception</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 75, marginTop: 4 }}>
+                {ticket.technicianSignature ? (
+                  <Image src={ticket.technicianSignature} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                ) : null}
+                {ticket.technicianStamp ? (
+                  <Image src={ticket.technicianStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                ) : null}
+              </View>
+              <Text style={styles.signatureFooterText}>Date &amp; Tampon Réception IT</Text>
             </View>
           </View>
         </View>

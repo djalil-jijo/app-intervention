@@ -60,11 +60,16 @@ model Technician {
   id           String               @id @default(cuid()) @db.VarChar(36)
   name         String               @db.VarChar(100)
   email        String               @unique @db.VarChar(100)
+  username     String?              @unique @db.VarChar(50)
+  passwordHash String?              @map("password_hash") @db.VarChar(255)
   phone        String?              @db.VarChar(20)
   speciality   String               @default("Généraliste") @db.VarChar(600) // Réseau, Hardware, Système, etc.
   role         String               @default("Technicien en Informatique") @db.VarChar(600)
+  signature    String?              @db.Text // صورة التوقيع الرقمي (Base64)
+  stamp        String?              @db.Text // صورة الختم الرسمي للتقني/المصلحة (Base64)
   active       Boolean              @default(true)
   createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   
   tickets              InterventionTicket[]
   maintenanceSchedules MaintenanceSchedule[]
@@ -158,6 +163,32 @@ model KnowledgeArticle {
   @@map("knowledge_articles")
 }
 
+// موظفو المؤسسة وطالبو التدخل (Employees / Demanders)
+model Employee {
+  id           String               @id @default(cuid()) @db.VarChar(36)
+  fullName     String               @map("full_name") @db.VarChar(100)
+  email        String               @unique @db.VarChar(100)
+  username     String               @unique @db.VarChar(50)
+  passwordHash String               @map("password_hash") @db.VarChar(255)
+  phone        String?              @db.VarChar(20)
+  functionTitle String?             @map("function_title") @db.VarChar(100)
+  service      String               @db.VarChar(100)
+  unitType     UnitType             @default(FILIALE) @map("unit_type")
+  unitName     String               @map("unit_name") @db.VarChar(150)
+  managerName  String?              @map("manager_name") @db.VarChar(100)
+  signature    String?              @db.Text // التوقيع الرقمي المعتمد (Base64)
+  stamp        String?              @db.Text // الختم الرسمي للموظف/المصلحة (Base64)
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tickets      InterventionTicket[]
+
+  @@index([unitType], map: "idx_employees_unit_type")
+  @@index([service], map: "idx_employees_service")
+  @@map("employees")
+}
+
 // تذاكر التدخل (Intervention Tickets)
 model InterventionTicket {
   id               String              @id @default(cuid()) @db.VarChar(36)
@@ -188,13 +219,22 @@ model InterventionTicket {
   createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // العلاقات بالعتاد والتقني المسؤول
+  // العلاقات بالموظف والعتاد والتقني المسؤول
+  employeeId       String?             @map("employee_id") @db.VarChar(36)
+  employee         Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
   assetId          String?             @map("asset_id") @db.VarChar(36)
   asset            ITAsset?            @relation(fields: [assetId], references: [id], onDelete: SetNull)
 
   technicianId     String?             @map("technician_id") @db.VarChar(36)
   technician       Technician?         @relation(fields: [technicianId], references: [id], onDelete: SetNull)
   
+  // الإمضاءات والأختام الرقمية المرفقة بالتذكرة
+  employeeSignature   String?          @map("employee_signature") @db.Text
+  employeeStamp       String?          @map("employee_stamp") @db.Text
+  technicianSignature String?          @map("technician_signature") @db.Text
+  technicianStamp     String?          @map("technician_stamp") @db.Text
+
   report           InterventionReport?
   stockMovements   StockMovement[]
   comments         TicketComment[]
@@ -204,6 +244,7 @@ model InterventionTicket {
   @@index([unitType], map: "idx_tickets_unit_type")
   @@index([unitName], map: "idx_tickets_unit_name")
   @@index([status], map: "idx_tickets_status")
+  @@index([employeeId], map: "idx_tickets_employee_id")
   @@map("intervention_tickets")
 }
 
@@ -219,6 +260,12 @@ model InterventionReport {
   partsReplaced   String?            @map("parts_replaced") @db.Text
   durationMinutes Int                @default(60) @map("duration_minutes")
   finalStatus     String             @default("Résolu & Opérationnel") @map("final_status") @db.VarChar(100)
+  
+  // التوقيعات والختم المعتمد في المحضر
+  technicianSignature String?        @map("technician_signature") @db.Text
+  technicianStamp     String?        @map("technician_stamp") @db.Text
+  clientSignature     String?        @map("client_signature") @db.Text
+
   completedAt     DateTime           @default(now()) @map("completed_at") @db.Timestamptz(6)
   
   ticket          InterventionTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ticket")

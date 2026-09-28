@@ -1,28 +1,35 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const COOKIE_NAME = 'admin_session';
-
-function verifyToken(token: string | undefined): boolean {
+function verifyTokenBasic(token: string | undefined): boolean {
   if (!token) return false;
   const parts = token.split('.');
-  if (parts.length !== 2) return false;
+  
+  // 3-part unified token [payload, timestamp, sig]
+  if (parts.length === 3) {
+    const timestamp = parseInt(parts[1], 10);
+    if (isNaN(timestamp)) return false;
+    const ageInSeconds = (Date.now() - timestamp) / 1000;
+    return ageInSeconds >= 0 && ageInSeconds <= 60 * 60 * 24 * 7;
+  }
 
-  const [timestampStr] = parts;
-  const timestamp = parseInt(timestampStr, 10);
-  if (isNaN(timestamp)) return false;
+  // 2-part legacy token [timestamp, sig]
+  if (parts.length === 2) {
+    const timestamp = parseInt(parts[0], 10);
+    if (isNaN(timestamp)) return false;
+    const ageInSeconds = (Date.now() - timestamp) / 1000;
+    return ageInSeconds >= 0 && ageInSeconds <= 60 * 60 * 24;
+  }
 
-  // Max age 24 hours
-  const ageInSeconds = (Date.now() - timestamp) / 1000;
-  return ageInSeconds >= 0 && ageInSeconds <= 60 * 60 * 24;
+  return false;
 }
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get(COOKIE_NAME)?.value;
-  const isAuthenticated = verifyToken(token);
+  const token = request.cookies.get('it_tasker_session')?.value || request.cookies.get('admin_session')?.value;
+  const isAuthenticated = verifyTokenBasic(token);
 
-  // Protect all /admin/* routes except /admin/login
+  // Protect /admin/* routes except /admin/login
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
     if (!isAuthenticated) {
       const loginUrl = new URL('/admin/login', request.url);

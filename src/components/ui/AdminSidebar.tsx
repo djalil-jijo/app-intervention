@@ -51,9 +51,10 @@ const erpNav: NavItem[] = [
   { href: '/admin/stock', label: 'Stock & Pièces', icon: Boxes },
   { href: '/admin/reports', label: 'Rapports & Exports', icon: FileSpreadsheet },
   { href: '/admin/technicians', label: 'Équipe IT Techniciens', icon: Users },
+  { href: '/admin/employees', label: 'Employés & Signatures', icon: UserCheck },
   { href: '/admin/knowledge', label: 'Base de Connaissances', icon: BookOpen },
   { href: '/admin/templates', label: 'Modèles & Pannes', icon: FileCode },
-  { href: '/admin/users', label: 'Utilisateurs & Rôles', icon: UserCheck },
+  { href: '/admin/users', label: 'Utilisateurs & Rôles', icon: ShieldCheck },
 ];
 
 const orgLevels = [

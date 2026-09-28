@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: {
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     borderRadius: 6,
     padding: 10,
-    height: 95,
+    height: 120,
     backgroundColor: '#FAFDFD',
   },
   signatureHeader: {
@@ -258,6 +258,8 @@ interface InterventionReportPDFProps {
     priority: string;
     description: string;
     createdAt: Date | string;
+    employeeSignature?: string | null;
+    employeeStamp?: string | null;
   };
   report: {
     reportNumber: string;
@@ -267,6 +269,9 @@ interface InterventionReportPDFProps {
     partsReplaced?: string | null;
     finalStatus: string;
     completedAt: Date | string;
+    technicianSignature?: string | null;
+    technicianStamp?: string | null;
+    clientSignature?: string | null;
   };
 }
 
@@ -441,15 +446,31 @@ export const InterventionReportPDF: React.FC<InterventionReportPDFProps> = ({
         <View style={styles.signatureSection}>
           <View style={styles.signatureGrid}>
             <View style={styles.signatureBox}>
-              <Text style={styles.signatureHeader}>Signature du Technicien IT</Text>
-              <Text style={styles.signatureSub}>Nom: {report.technicianName}</Text>
-              <Text style={styles.signatureFooterText}>Date & Cachet du service IT</Text>
+              <Text style={styles.signatureHeader}>Signature &amp; Cachet Technicien IT</Text>
+              <Text style={styles.signatureSub}>Technicien: {report.technicianName}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 72, marginTop: 4 }}>
+                {report.technicianSignature ? (
+                  <Image src={report.technicianSignature} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                ) : null}
+                {report.technicianStamp ? (
+                  <Image src={report.technicianStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                ) : null}
+              </View>
+              <Text style={styles.signatureFooterText}>Date &amp; Cachet du service IT</Text>
             </View>
 
             <View style={styles.signatureBox}>
               <Text style={styles.signatureHeader}>Bon pour accord / Client Demandeur</Text>
               <Text style={styles.signatureSub}>Nom: {ticket.fullName}</Text>
-              <Text style={styles.signatureFooterText}>Signature & Validation du demandeur</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 72, marginTop: 4 }}>
+                {report.clientSignature || ticket.employeeSignature ? (
+                  <Image src={report.clientSignature || ticket.employeeSignature!} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                ) : null}
+                {ticket.employeeStamp ? (
+                  <Image src={ticket.employeeStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                ) : null}
+              </View>
+              <Text style={styles.signatureFooterText}>Signature &amp; Validation du demandeur</Text>
             </View>
           </View>
         </View>

@@ -32,6 +32,10 @@ import {
   FileText,
   TrendingUp,
   Calendar,
+  Activity,
+  Gauge,
+  Zap,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -75,15 +79,26 @@ export default function AdminDashboardPage() {
     loadDashboardData();
   };
 
-  const totalTickets = tickets.length;
-  const pendingTickets = tickets.filter((t) => t.status === 'PENDING').length;
-  const inProgressTickets = tickets.filter((t) => t.status === 'IN_PROGRESS').length;
-  const resolvedTickets = tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
-  const resolutionRate = stats?.resolutionRate ?? (totalTickets > 0 ? Math.round((resolvedTickets / totalTickets) * 100) : 0);
+  const totalTickets     = tickets.length;
+  const pendingTickets   = tickets.filter((t) => t.status === 'PENDING').length;
+  const inProgressTickets= tickets.filter((t) => t.status === 'IN_PROGRESS').length;
+  const resolvedTickets  = tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
+  const resolutionRate   = stats?.resolutionRate ?? (totalTickets > 0 ? Math.round((resolvedTickets / totalTickets) * 100) : 0);
 
   const filialeCount = stats?.byUnitType?.FILIALE ?? tickets.filter((t) => t.unitType === 'FILIALE').length;
-  const cicCount = stats?.byUnitType?.CIC ?? tickets.filter((t) => t.unitType === 'CIC').length;
-  const upcCount = stats?.byUnitType?.UPC ?? tickets.filter((t) => t.unitType === 'UPC').length;
+  const cicCount     = stats?.byUnitType?.CIC ?? tickets.filter((t) => t.unitType === 'CIC').length;
+  const upcCount     = stats?.byUnitType?.UPC ?? tickets.filter((t) => t.unitType === 'UPC').length;
+
+  // SLA & performance metrics
+  const slaBreachRate   = stats?.slaBreachRate ?? 0;
+  const closedLast7Days = stats?.closedLast7Days ?? 0;
+  const criticalPending = stats?.criticalPending ?? 0;
+  const avgResolution   = stats?.avgResolutionHours ?? 0;
+
+  // Intervention type breakdown
+  const curativeCount    = stats?.byInterventionType?.CURATIVE ?? 0;
+  const preventiveCount  = stats?.byInterventionType?.PREVENTIVE ?? 0;
+  const installCount     = stats?.byInterventionType?.INSTALLATION ?? 0;
 
   return (
     <div className="space-y-8 pb-12">
@@ -126,6 +141,91 @@ export default function AdminDashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* SLA Live Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* SLA Breach Rate */}
+        <div className={`rounded-2xl p-4 border flex items-center gap-3 ${
+          slaBreachRate > 30 ? 'bg-rose-500/10 border-rose-500/30' :
+          slaBreachRate > 15 ? 'bg-amber-500/10 border-amber-500/30' :
+          'bg-emerald-500/10 border-emerald-500/30'
+        }`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            slaBreachRate > 30 ? 'bg-rose-500/20' : slaBreachRate > 15 ? 'bg-amber-500/20' : 'bg-emerald-500/20'
+          }`}>
+            <Gauge className={`w-5 h-5 ${
+              slaBreachRate > 30 ? 'text-rose-400' : slaBreachRate > 15 ? 'text-amber-400' : 'text-emerald-400'
+            }`} />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">معدل تجاوز SLA</p>
+            <p className={`text-2xl font-black ${
+              slaBreachRate > 30 ? 'text-rose-300' : slaBreachRate > 15 ? 'text-amber-300' : 'text-emerald-400'
+            }`}>{slaBreachRate}%</p>
+            <p className="text-[10px] text-slate-500">تجاوز 48 ساعة</p>
+          </div>
+        </div>
+
+        {/* Critical Pending */}
+        <div className={`rounded-2xl p-4 border flex items-center gap-3 ${
+          criticalPending > 0 ? 'bg-rose-500/10 border-rose-500/30' : 'bg-navy-900/80 border-navy-800'
+        }`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            criticalPending > 0 ? 'bg-rose-500/20' : 'bg-navy-850'
+          }`}>
+            <AlertTriangle className={`w-5 h-5 ${criticalPending > 0 ? 'text-rose-400' : 'text-slate-600'}`} />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">حرجة متأخرة</p>
+            <p className={`text-2xl font-black ${criticalPending > 0 ? 'text-rose-300' : 'text-slate-400'}`}>{criticalPending}</p>
+            <p className="text-[10px] text-slate-500">&gt; 4 ساعات بدون حل</p>
+          </div>
+        </div>
+
+        {/* Avg Resolution */}
+        <div className="bg-navy-900/80 border border-navy-800 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5 text-sky-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">متوسط وقت الحل</p>
+            <p className="text-2xl font-black text-sky-300">{avgResolution}س</p>
+            <p className="text-[10px] text-slate-500">لكل تدخل مكتمل</p>
+          </div>
+        </div>
+
+        {/* Closed last 7 days */}
+        <div className="bg-navy-900/80 border border-navy-800 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">مغلقة (7 أيام)</p>
+            <p className="text-2xl font-black text-indigo-300">{closedLast7Days}</p>
+            <p className="text-[10px] text-slate-500">تدخل مكتمل</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Intervention Type Breakdown */}
+      {totalTickets > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'تدخلات علاجية', count: curativeCount, color: 'text-rose-300', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: Wrench },
+            { label: 'تدخلات وقائية', count: preventiveCount, color: 'text-amber-300', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: ShieldCheck },
+            { label: 'عمليات تثبيت', count: installCount, color: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle2 },
+          ].map(({ label, count, color, bg, border, icon: Icon }) => (
+            <div key={label} className={`${bg} border ${border} rounded-2xl p-4 flex items-center justify-between`}>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+                <p className={`text-xl font-black ${color}`}>{count}</p>
+                <p className="text-[10px] text-slate-500">{totalTickets > 0 ? Math.round((count / totalTickets) * 100) : 0}% من الإجمالي</p>
+              </div>
+              <Icon className={`w-6 h-6 ${color} opacity-60`} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Critical & Stock Alerts */}
       {stats?.stockStats?.lowStock > 0 && (
@@ -398,9 +498,11 @@ export default function AdminDashboardPage() {
               </thead>
               <tbody className="divide-y divide-navy-800/60 text-xs font-medium text-slate-300">
                 {tickets.slice(0, 8).map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-navy-850/60 transition-colors">
+                  <tr key={ticket.id} className="hover:bg-navy-850/60 transition-colors group">
                     <td className="py-3.5 px-4 font-mono font-bold text-sky-400 dir-ltr text-right">
-                      {ticket.ticketNumber}
+                      <Link href={`/admin/tickets/${ticket.id}`} className="hover:text-sky-300 hover:underline transition-colors">
+                        {ticket.ticketNumber}
+                      </Link>
                     </td>
                     <td className="py-3.5 px-4">
                       <p className="font-bold text-white">{ticket.fullName}</p>
@@ -432,22 +534,31 @@ export default function AdminDashboardPage() {
                       <StatusBadge status={ticket.status} />
                     </td>
                     <td className="py-3.5 px-4 text-left">
-                      {ticket.report ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                          <Check className="w-3.5 h-3.5" />
-                          محضر محرر #{ticket.report.reportNumber}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setSelectedTicket(ticket);
-                            setIsReportModalOpen(true);
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-300 hover:bg-sky-500/30 text-[11px] font-bold transition-all"
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/admin/tickets/${ticket.id}`}
+                          className="p-1.5 rounded-xl bg-navy-850 hover:bg-indigo-500/10 border border-navy-750 hover:border-indigo-500/30 text-slate-400 hover:text-indigo-300 transition-all"
+                          title="عرض التفاصيل"
                         >
-                          تحرير المحضر PDF
-                        </button>
-                      )}
+                          <Eye className="w-3.5 h-3.5" />
+                        </Link>
+                        {ticket.report ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                            <Check className="w-3.5 h-3.5" />
+                            #{ticket.report.reportNumber}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedTicket(ticket);
+                              setIsReportModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-300 hover:bg-sky-500/30 text-[11px] font-bold transition-all"
+                          >
+                            محضر PDF
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

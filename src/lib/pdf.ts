@@ -32,6 +32,8 @@ export async function renderReportPDFToBuffer(
     priority:      string;
     description:   string;
     createdAt:     Date | string;
+    employeeSignature?: string | null;
+    employeeStamp?: string | null;
   },
   report: {
     reportNumber:   string;
@@ -41,6 +43,9 @@ export async function renderReportPDFToBuffer(
     partsReplaced?: string | null;
     finalStatus:    string;
     completedAt:    Date | string;
+    technicianSignature?: string | null;
+    technicianStamp?: string | null;
+    clientSignature?: string | null;
   }
 ): Promise<Buffer> {
   const element = React.createElement(InterventionReportPDF, { ticket, report });
@@ -64,6 +69,10 @@ export async function renderTicketPDFToBuffer(ticket: {
   description:   string;
   status:        string;
   createdAt:     Date | string;
+  employeeSignature?: string | null;
+  employeeStamp?: string | null;
+  technicianSignature?: string | null;
+  technicianStamp?: string | null;
 }): Promise<Buffer> {
   const element = React.createElement(InterventionTicketPDF, { ticket });
   return pdfToBuffer(element);

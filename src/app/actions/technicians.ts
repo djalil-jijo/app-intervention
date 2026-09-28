@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import bcrypt from 'bcryptjs';
 
 export async function getTechniciansAction() {
   try {
@@ -43,9 +44,14 @@ export async function createTechnicianAction(data: {
   phone?: string;
   speciality?: string | string[];
   role?: string;
+  username?: string;
+  password?: string;
+  signature?: string;
+  stamp?: string;
 }) {
   try {
-    const existing = await prisma.technician.findUnique({ where: { email: data.email } });
+    const cleanEmail = data.email.trim().toLowerCase();
+    const existing = await prisma.technician.findUnique({ where: { email: cleanEmail } });
     if (existing) {
       return { success: false, error: 'Un membre avec cet email existe déjà.' };
     }
@@ -54,20 +60,25 @@ export async function createTechnicianAction(data: {
       ? data.speciality.join(', ')
       : (data.speciality || 'Généraliste');
 
-    // Safe truncation if column in PostgreSQL database is still limited
     if (finalSpeciality.length > 490) {
       finalSpeciality = finalSpeciality.substring(0, 487) + '...';
     }
 
     const finalRole = (data.role || 'Technicien en Informatique').substring(0, 95);
+    const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : null;
+    const cleanUsername = data.username ? data.username.trim().toLowerCase() : null;
 
     const tech = await prisma.technician.create({
       data: {
         name: data.name.trim(),
-        email: data.email.trim(),
+        email: cleanEmail,
+        username: cleanUsername,
+        passwordHash,
         phone: data.phone ? data.phone.trim() : null,
         speciality: finalSpeciality,
         role: finalRole,
+        signature: data.signature || null,
+        stamp: data.stamp || null,
         active: true
       }
     });
@@ -76,12 +87,6 @@ export async function createTechnicianAction(data: {
     return { success: true, data: tech };
   } catch (error: any) {
     console.error('Error creating technician:', error);
-    if (error?.code === 'P2000') {
-      return { 
-        success: false, 
-        error: 'النص المدخل في التخصص أو الصفة يتجاوز السعة المسموحة في قاعدة البيانات. يرجى تنفيذ أمر ALTER TABLE لتوسيع الحقل أو اختيار تخصصات أقل.' 
-      };
-    }
     return { success: false, error: error.message || 'Erreur lors de la création du profil' };
   }
 }
@@ -92,21 +97,34 @@ export async function updateTechnicianAction(id: string, data: {
   phone?: string;
   speciality?: string | string[];
   role?: string;
+  username?: string;
+  password?: string;
+  signature?: string | null;
+  stamp?: string | null;
+  active?: boolean;
 }) {
   try {
     const finalSpeciality = Array.isArray(data.speciality)
       ? data.speciality.join(', ')
       : data.speciality;
 
+    const updateData: any = {};
+    if (data.name) updateData.name = data.name.trim();
+    if (data.email) updateData.email = data.email.trim().toLowerCase();
+    if (data.phone !== undefined) updateData.phone = data.phone?.trim() || null;
+    if (finalSpeciality) updateData.speciality = finalSpeciality;
+    if (data.role) updateData.role = data.role;
+    if (data.username !== undefined) updateData.username = data.username?.trim().toLowerCase() || null;
+    if (data.signature !== undefined) updateData.signature = data.signature;
+    if (data.stamp !== undefined) updateData.stamp = data.stamp;
+    if (data.active !== undefined) updateData.active = data.active;
+    if (data.password && data.password.trim().length >= 6) {
+      updateData.passwordHash = await bcrypt.hash(data.password.trim(), 10);
+    }
+
     const updated = await prisma.technician.update({
       where: { id },
-      data: {
-        ...(data.name && { name: data.name }),
-        ...(data.email && { email: data.email }),
-        ...(data.phone !== undefined && { phone: data.phone }),
-        ...(finalSpeciality && { speciality: finalSpeciality }),
-        ...(data.role && { role: data.role }),
-      }
+      data: updateData
     });
 
     revalidatePath('/admin/technicians');

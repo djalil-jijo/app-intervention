@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { getAssetsAction, createAssetAction, getAssetDetailsAction, deleteAssetAction } from '@/app/actions/assets';
+import { getAssetsAction, createAssetAction, getAssetDetailsAction, deleteAssetAction, updateAssetAction } from '@/app/actions/assets';
 import { SiteBadge } from '@/components/admin/SiteBadge';
 import {
   Laptop, Search, Plus, RefreshCw, Server, Printer, Monitor, HardDrive, ShieldAlert,
-  Calendar, User, Tag, Trash2, Eye, X, CheckCircle, AlertOctagon, Wrench, Shield, FileSignature
+  Calendar, User, Tag, Trash2, Eye, X, CheckCircle, AlertOctagon, Wrench, Shield, FileSignature,
+  Edit2, AlertTriangle, Clock,
 } from 'lucide-react';
 
 export default function AdminAssetsPage() {
@@ -21,6 +22,9 @@ export default function AdminAssetsPage() {
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
   const [assetHistory, setAssetHistory] = useState<any | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [editAsset, setEditAsset] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   // New Asset Form State
   const [formData, setFormData] = useState({
@@ -94,6 +98,55 @@ export default function AdminAssetsPage() {
       await deleteAssetAction(id);
       fetchAssets();
     }
+  };
+
+  const handleOpenEdit = (ast: any) => {
+    setEditAsset(ast);
+    setEditForm({
+      name: ast.name,
+      brand: ast.brand || '',
+      model: ast.model || '',
+      serialNumber: ast.serialNumber || '',
+      unitType: ast.unitType,
+      unitName: ast.unitName,
+      service: ast.service || '',
+      assignedTo: ast.assignedTo || '',
+      ipAddress: ast.ipAddress || '',
+      status: ast.status,
+      notes: ast.notes || '',
+    });
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editAsset) return;
+    setEditSubmitting(true);
+    try {
+      const res = await updateAssetAction(editAsset.id, editForm);
+      if (res.success) {
+        setEditAsset(null);
+        fetchAssets();
+      } else {
+        alert(res.error || 'خطأ في التحديث');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  // Warranty helpers
+  const getWarrantyBadge = (warrantyEnd: string | null) => {
+    if (!warrantyEnd) return null;
+    const end   = new Date(warrantyEnd);
+    const today = new Date();
+    const diffDays = Math.floor((end.getTime() - today.getTime()) / 86400000);
+    if (diffDays < 0)
+      return <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400"><AlertTriangle className="w-3 h-3" />ضمان منتهي</span>;
+    if (diffDays < 90)
+      return <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400"><Clock className="w-3 h-3" />{diffDays}ي متبقي</span>;
+    return <span className="text-[10px] font-bold text-emerald-400">{Math.floor(diffDays / 30)}ش متبقي</span>;
   };
 
   const getStatusBadge = (status: string) => {
@@ -217,6 +270,7 @@ export default function AdminAssetsPage() {
                   <th className="py-3.5 px-4 text-right">الرقم التسلسلي S/N</th>
                   <th className="py-3.5 px-4 text-right">الموقع / الهيكل</th>
                   <th className="py-3.5 px-4 text-right">المستعمل المسند له</th>
+                  <th className="py-3.5 px-4 text-right">الضمان</th>
                   <th className="py-3.5 px-4 text-right">الحالة التقنية</th>
                   <th className="py-3.5 px-4 text-left">الإجراءات</th>
                 </tr>
@@ -225,7 +279,12 @@ export default function AdminAssetsPage() {
                 {assets.map((ast) => (
                   <tr key={ast.id} className="hover:bg-navy-850/60 transition-colors">
                     <td className="py-4 px-4 font-mono font-bold text-sky-400">
-                      {ast.assetTag}
+                      <div>{ast.assetTag}</div>
+                      {ast.purchaseDate && (
+                        <div className="text-[9px] text-slate-500 mt-0.5">
+                          {Math.floor((Date.now() - new Date(ast.purchaseDate).getTime()) / 86400000 / 365)}سنة
+                        </div>
+                      )}
                     </td>
                     <td className="py-4 px-4">
                       <p className="font-bold text-white">{ast.name}</p>
@@ -242,30 +301,40 @@ export default function AdminAssetsPage() {
                       <p className="text-[10px] text-slate-500">{ast.service}</p>
                     </td>
                     <td className="py-4 px-4">
+                      {getWarrantyBadge(ast.warrantyEnd)}
+                    </td>
+                    <td className="py-4 px-4">
                       {getStatusBadge(ast.status)}
                     </td>
                     <td className="py-4 px-4 text-left">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Link
                           href="/admin/decharges"
                           className="p-1.5 rounded-lg bg-navy-800 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
-                          title="تحرير / استعراض سندات التسليم"
+                          title="سندات التسليم"
                         >
-                          <FileSignature className="w-4 h-4" />
+                          <FileSignature className="w-3.5 h-3.5" />
                         </Link>
+                        <button
+                          onClick={() => handleOpenEdit(ast)}
+                          className="p-1.5 rounded-lg bg-navy-800 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                          title="تعديل بيانات العتاد"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleViewAssetDetails(ast)}
                           className="p-1.5 rounded-lg bg-navy-800 text-sky-400 hover:bg-sky-500/20 transition-colors"
                           title="التاريخ التقني"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteAsset(ast.id)}
                           className="p-1.5 rounded-lg bg-navy-800 text-rose-400 hover:bg-rose-500/20 transition-colors"
                           title="حذف"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -529,6 +598,76 @@ export default function AdminAssetsPage() {
                 )}
               </div>
             ) : null}
+          </div>
+        </div>
+      )}
+      {/* Edit Asset Modal */}
+      {editAsset && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-navy-900 border border-navy-750 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-navy-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-white">تعديل بيانات العتاد</h3>
+                <p className="text-[11px] text-sky-400 font-mono">{editAsset.assetTag}</p>
+              </div>
+              <button onClick={() => setEditAsset(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-3 text-xs font-semibold">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">اسم الجهاز</label>
+                  <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full bg-navy-950 border border-navy-750 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">الحالة التقنية</label>
+                  <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full bg-navy-950 border border-navy-750 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-500">
+                    <option value="OPERATIONAL">شغال ممتاز</option>
+                    <option value="DEFECTIVE">متعطل</option>
+                    <option value="UNDER_MAINTENANCE">تحت الصيانة</option>
+                    <option value="SCRAPPED">خارج الخدمة</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">المستعمل المسند له</label>
+                  <input type="text" value={editForm.assignedTo} onChange={(e) => setEditForm({ ...editForm, assignedTo: e.target.value })}
+                    placeholder="اسم المستعمل..."
+                    className="w-full bg-navy-950 border border-navy-750 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">المصلحة</label>
+                  <input type="text" value={editForm.service} onChange={(e) => setEditForm({ ...editForm, service: e.target.value })}
+                    className="w-full bg-navy-950 border border-navy-750 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-slate-400 block mb-1">عنوان IP</label>
+                  <input type="text" value={editForm.ipAddress} onChange={(e) => setEditForm({ ...editForm, ipAddress: e.target.value })}
+                    placeholder="192.168.x.x"
+                    className="w-full bg-navy-950 border border-navy-750 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-slate-400 block mb-1">ملاحظات تقنية</label>
+                  <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    rows={2} placeholder="ملاحظات إضافية..."
+                    className="w-full bg-navy-950 border border-navy-750 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-500 resize-none" />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-navy-800">
+                <button type="button" onClick={() => setEditAsset(null)}
+                  className="px-4 py-2 rounded-xl bg-navy-850 border border-navy-750 text-slate-300 hover:text-white text-xs font-bold transition-all">
+                  إلغاء
+                </button>
+                <button type="submit" disabled={editSubmitting}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white text-xs font-extrabold shadow-lg hover:opacity-90 transition-all disabled:opacity-50">
+                  {editSubmitting ? 'جاري الحفظ...' : '💾 حفظ التعديلات'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

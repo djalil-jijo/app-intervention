@@ -5,9 +5,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createReportSchema, CreateReportInput } from '@/lib/validations';
 import { createReportAction } from '@/app/actions/reports';
-import { X, FileCheck, Loader2, AlertCircle, CheckCircle2, Download, Printer, User, Wrench, FileText, Check } from 'lucide-react';
+import {
+  X, FileCheck, Loader2, AlertCircle, CheckCircle2, Download,
+  Printer, User, Wrench, FileText, Check, PenTool, Award
+} from 'lucide-react';
 import { UnitTypeBadge } from './UnitTypeBadge';
 import { PriorityBadge } from './PriorityBadge';
+import { SignaturePadModal } from '@/components/ui/SignaturePadModal';
+import { StampStudioModal } from '@/components/ui/StampStudioModal';
 
 interface TicketData {
   id:            string;
@@ -22,6 +27,15 @@ interface TicketData {
   serialNumber?: string | null;
   priority:      string;
   description:   string;
+  technicianId?: string | null;
+  technician?:   {
+    id: string;
+    name: string;
+    signature?: string | null;
+    stamp?: string | null;
+  } | null;
+  technicianSignature?: string | null;
+  technicianStamp?:     string | null;
 }
 
 interface ReportFormModalProps {
@@ -54,16 +68,23 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     ticketNumber: string;
   } | null>(null);
 
+  // Digital Signature & Official Stamp state
+  const [technicianSignature, setTechnicianSignature] = useState<string | null>(null);
+  const [technicianStamp, setTechnicianStamp] = useState<string | null>(null);
+  const [isSigModalOpen, setIsSigModalOpen] = useState(false);
+  const [isStampModalOpen, setIsStampModalOpen] = useState(false);
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<CreateReportInput>({
     resolver: zodResolver(createReportSchema),
     defaultValues: {
       ticketId:      ticket?.id || '',
-      technicianName: '',
+      technicianName: ticket?.technician?.name || '',
       diagnosis:     '',
       actionsTaken:  '',
       partsReplaced: '',
@@ -71,16 +92,20 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     },
   });
 
+  const techNameWatch = watch('technicianName');
+
   React.useEffect(() => {
     if (ticket) {
       reset({
         ticketId:      ticket.id,
-        technicianName: '',
+        technicianName: ticket.technician?.name || '',
         diagnosis:     '',
         actionsTaken:  '',
         partsReplaced: '',
         finalStatus:   'Résolu avec succès',
       });
+      setTechnicianSignature(ticket.technicianSignature || ticket.technician?.signature || null);
+      setTechnicianStamp(ticket.technicianStamp || ticket.technician?.stamp || null);
       setErrorMsg(null);
       setCreatedReportData(null);
     }
@@ -92,7 +117,12 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      const res = await createReportAction({ ...data, ticketId: ticket.id });
+      const res = await createReportAction({
+        ...data,
+        ticketId: ticket.id,
+        technicianSignature: technicianSignature || undefined,
+        technicianStamp: technicianStamp || undefined,
+      });
       if (res.success && res.data) {
         setCreatedReportData({
           ticketId:     ticket.id,
@@ -297,6 +327,58 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* ── Technician Digital Signature & Official Stamp Section ── */}
+                <div className="pt-2 border-t border-navy-800 space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    الإمضاء والختم الرقمي للتقني المتدخل (Intervention Signatures & Cachet) :
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Signature */}
+                    <div className="p-4 rounded-2xl bg-navy-950 border border-navy-800 flex flex-col items-center gap-2.5">
+                      <span className="text-xs font-bold text-slate-300 flex items-center gap-1">
+                        <PenTool className="w-3.5 h-3.5 text-sky-400" />
+                        التوقيع الرقمي للتقني
+                      </span>
+                      <div className="w-full h-28 bg-white rounded-2xl p-2 flex items-center justify-center border border-slate-300 shadow-inner">
+                        {technicianSignature ? (
+                          <img src={technicianSignature} alt="Sig" className="max-h-full max-w-full object-contain" />
+                        ) : (
+                          <span className="text-xs text-slate-400 font-bold">غير مدرج بعد</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSigModalOpen(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition-colors"
+                      >
+                        {technicianSignature ? 'تعديل التوقيع' : 'رسم / رفع التوقيع'}
+                      </button>
+                    </div>
+
+                    {/* Stamp */}
+                    <div className="p-4 rounded-2xl bg-navy-950 border border-navy-800 flex flex-col items-center gap-2.5">
+                      <span className="text-xs font-bold text-slate-300 flex items-center gap-1">
+                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        الختم الرسمي لمصلحة IT (الحجم الطبيعي)
+                      </span>
+                      <div className="w-full h-28 bg-white rounded-2xl p-2 flex items-center justify-center border border-slate-300 shadow-inner">
+                        {technicianStamp ? (
+                          <img src={technicianStamp} alt="Stamp" className="max-h-full max-w-full object-contain" />
+                        ) : (
+                          <span className="text-xs text-slate-400 font-bold">غير مدرج بعد</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsStampModalOpen(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-colors"
+                      >
+                        {technicianStamp ? 'تعديل الختم' : 'توليد / رفع ختم'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </form>
             </>
           )}
@@ -344,6 +426,23 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Signature & Stamp Modals */}
+      <SignaturePadModal
+        isOpen={isSigModalOpen}
+        onClose={() => setIsSigModalOpen(false)}
+        onSave={(sig) => setTechnicianSignature(sig)}
+        initialSignature={technicianSignature}
+      />
+      <StampStudioModal
+        isOpen={isStampModalOpen}
+        onClose={() => setIsStampModalOpen(false)}
+        onSave={(st) => setTechnicianStamp(st)}
+        initialStamp={technicianStamp}
+        defaultOrgName={ticket?.unitName || 'DIRECTION DES SYSTEMES D\'INFORMATION'}
+        defaultServiceName="SERVICE MAINTENANCE & SUPPORT IT"
+        defaultUserName={techNameWatch || 'TECHNICIEN IT'}
+      />
     </div>
   );
 };
