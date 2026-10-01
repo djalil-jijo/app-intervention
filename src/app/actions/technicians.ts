@@ -127,7 +127,24 @@ export async function updateTechnicianAction(id: string, data: {
       data: updateData
     });
 
+    // Synchroniser automatiquement le nouveau sceau et la signature avec les tickets en cours de ce technicien
+    if (data.signature !== undefined || data.stamp !== undefined) {
+      const ticketUpdateData: any = {};
+      if (data.signature !== undefined) ticketUpdateData.technicianSignature = data.signature;
+      if (data.stamp !== undefined) ticketUpdateData.technicianStamp = data.stamp;
+
+      await prisma.interventionTicket.updateMany({
+        where: {
+          technicianId: id,
+          status: { in: ['PENDING', 'IN_PROGRESS'] },
+        },
+        data: ticketUpdateData,
+      });
+    }
+
     revalidatePath('/admin/technicians');
+    revalidatePath('/admin/tickets');
+    revalidatePath('/admin/dashboard');
     return { success: true, data: updated };
   } catch (error: any) {
     console.error('Error updating technician:', error);
@@ -148,21 +165,53 @@ export async function deleteTechnicianAction(id: string) {
 
 export async function assignTicketTechnicianAction(ticketId: string, technicianId: string) {
   try {
-    const ticket = await prisma.interventionTicket.findUnique({ where: { id: ticketId } });
+    const techId = (!technicianId || technicianId === 'NONE') ? null : technicianId;
+    const ticket = await prisma.interventionTicket.findUnique({
+      where: { id: ticketId },
+      include: { report: true },
+    });
     if (!ticket) return { success: false, error: 'Ticket introuvable' };
 
-    const newStatus = ticket.status === 'PENDING' ? 'IN_PROGRESS' : ticket.status;
+    const newStatus = (techId && ticket.status === 'PENDING') ? 'IN_PROGRESS' : ticket.status;
+
+    let techSig: string | null = null;
+    let techStamp: string | null = null;
+    let techName: string | null = null;
+
+    if (techId) {
+      const tech = await prisma.technician.findUnique({ where: { id: techId } });
+      if (tech) {
+        techSig = tech.signature || null;
+        techStamp = tech.stamp || null;
+        techName = tech.name;
+      }
+    }
 
     await prisma.interventionTicket.update({
       where: { id: ticketId },
       data: {
-        technicianId: technicianId || null,
-        status: newStatus
-      }
+        technicianId: techId,
+        status: newStatus,
+        technicianSignature: techSig,
+        technicianStamp: techStamp,
+      },
     });
+
+    if (ticket.report && techName) {
+      await prisma.interventionReport.update({
+        where: { id: ticket.report.id },
+        data: {
+          technicianName: techName,
+          technicianSignature: techSig,
+          technicianStamp: techStamp,
+        },
+      });
+    }
 
     revalidatePath('/admin/dashboard');
     revalidatePath('/admin/tickets');
+    revalidatePath(`/admin/tickets/${ticketId}`);
+    revalidatePath('/track');
     return { success: true };
   } catch (error: any) {
     console.error('Error assigning technician:', error);

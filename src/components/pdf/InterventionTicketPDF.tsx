@@ -187,8 +187,9 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     borderRadius: 6,
     padding: 10,
-    height: 125,
+    height: 100,
     backgroundColor: '#FAFDFD',
+    position: 'relative',
   },
   signatureHeader: {
     fontSize: 9,
@@ -402,12 +403,12 @@ export const InterventionTicketPDF: React.FC<InterventionTicketPDFProps> = ({ ti
             <View style={styles.signatureBox}>
               <Text style={styles.signatureHeader}>Signature &amp; Cachet Demandeur</Text>
               <Text style={styles.signatureSub}>Nom: {ticket.fullName}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 75, marginTop: 4 }}>
+              <View style={{ position: 'absolute', top: 28, left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' }}>
                 {ticket.employeeSignature ? (
-                  <Image src={ticket.employeeSignature} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                  <Image src={ticket.employeeSignature} style={{ maxWidth: 160, maxHeight: 100, objectFit: 'contain' }} />
                 ) : null}
                 {ticket.employeeStamp ? (
-                  <Image src={ticket.employeeStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                  <Image src={ticket.employeeStamp} style={{ width: 220, height: 220, objectFit: 'contain' }} />
                 ) : null}
               </View>
               <Text style={styles.signatureFooterText}>Date &amp; Emargement demandeur</Text>
@@ -416,12 +417,12 @@ export const InterventionTicketPDF: React.FC<InterventionTicketPDFProps> = ({ ti
             <View style={styles.signatureBox}>
               <Text style={styles.signatureHeader}>Réception Support IT</Text>
               <Text style={styles.signatureSub}>Prise en charge IT</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 75, marginTop: 4 }}>
+              <View style={{ position: 'absolute', top: 28, left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' }}>
                 {ticket.technicianSignature ? (
-                  <Image src={ticket.technicianSignature} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                  <Image src={ticket.technicianSignature} style={{ maxWidth: 160, maxHeight: 100, objectFit: 'contain' }} />
                 ) : null}
                 {ticket.technicianStamp ? (
-                  <Image src={ticket.technicianStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                  <Image src={ticket.technicianStamp} style={{ width: 220, height: 220, objectFit: 'contain' }} />
                 ) : null}
               </View>
               <Text style={styles.signatureFooterText}>Date &amp; Tampon Réception IT</Text>

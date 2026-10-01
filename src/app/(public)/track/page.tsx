@@ -570,9 +570,9 @@ export default function TrackPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {/* Signature */}
                   <div className="h-20 bg-white rounded-xl p-1.5 flex items-center justify-center border border-slate-300 shadow-inner">
-                    {ticket.technicianSignature || ticket.technician?.signature ? (
+                    {ticket.technician && (ticket.technicianSignature || ticket.technician.signature) ? (
                       <img
-                        src={ticket.technicianSignature || ticket.technician?.signature}
+                        src={(ticket.technicianSignature || ticket.technician.signature)!}
                         alt="Technician Signature"
                         className="max-h-full max-w-full object-contain"
                       />
@@ -583,9 +583,9 @@ export default function TrackPage() {
 
                   {/* Stamp */}
                   <div className="h-20 bg-white rounded-xl p-1.5 flex items-center justify-center border border-slate-300 shadow-inner">
-                    {ticket.technicianStamp || ticket.technician?.stamp ? (
+                    {ticket.technician && (ticket.technicianStamp || ticket.technician.stamp) ? (
                       <img
-                        src={ticket.technicianStamp || ticket.technician?.stamp}
+                        src={(ticket.technicianStamp || ticket.technician.stamp)!}
                         alt="Technician Stamp"
                         className="max-h-full max-w-full object-contain"
                       />

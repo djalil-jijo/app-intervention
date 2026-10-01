@@ -11,7 +11,7 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     color: '#1E293B',
   },
-  
+
   // Header section
   headerContainer: {
     flexDirection: 'row',
@@ -200,8 +200,9 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     borderRadius: 6,
     padding: 10,
-    height: 120,
+    height: 100,
     backgroundColor: '#FAFDFD',
+    position: 'relative',
   },
   signatureHeader: {
     fontSize: 9,
@@ -277,14 +278,14 @@ interface InterventionReportPDFProps {
 
 const unitTypeMap: Record<string, string> = {
   FILIALE: 'Filiale (Dir. Régionale)',
-  CIC:     'CIC (Dir. Wilaya)',
-  UPC:     'UPC (Unité Prod.)',
+  CIC: 'CIC (Dir. Wilaya)',
+  UPC: 'UPC (Unité Prod.)',
 };
 
 const priorityMap: Record<string, string> = {
-  LOW:      'Basse',
-  MEDIUM:   'Moyenne',
-  URGENT:   'Urgente',
+  LOW: 'Basse',
+  MEDIUM: 'Moyenne',
+  URGENT: 'Urgente',
   CRITICAL: 'Haute / Critique',
 };
 
@@ -448,12 +449,12 @@ export const InterventionReportPDF: React.FC<InterventionReportPDFProps> = ({
             <View style={styles.signatureBox}>
               <Text style={styles.signatureHeader}>Signature &amp; Cachet Technicien IT</Text>
               <Text style={styles.signatureSub}>Technicien: {report.technicianName}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 72, marginTop: 4 }}>
+              <View style={{ position: 'absolute', top: 28, left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' }}>
                 {report.technicianSignature ? (
-                  <Image src={report.technicianSignature} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                  <Image src={report.technicianSignature} style={{ maxWidth: 160, maxHeight: 100, objectFit: 'contain' }} />
                 ) : null}
                 {report.technicianStamp ? (
-                  <Image src={report.technicianStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                  <Image src={report.technicianStamp} style={{ width: 220, height: 220, objectFit: 'contain' }} />
                 ) : null}
               </View>
               <Text style={styles.signatureFooterText}>Date &amp; Cachet du service IT</Text>
@@ -462,12 +463,12 @@ export const InterventionReportPDF: React.FC<InterventionReportPDFProps> = ({
             <View style={styles.signatureBox}>
               <Text style={styles.signatureHeader}>Bon pour accord / Client Demandeur</Text>
               <Text style={styles.signatureSub}>Nom: {ticket.fullName}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 72, marginTop: 4 }}>
+              <View style={{ position: 'absolute', top: 28, left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' }}>
                 {report.clientSignature || ticket.employeeSignature ? (
-                  <Image src={report.clientSignature || ticket.employeeSignature!} style={{ maxWidth: 105, maxHeight: 60, objectFit: 'contain' }} />
+                  <Image src={report.clientSignature || ticket.employeeSignature!} style={{ maxWidth: 160, maxHeight: 100, objectFit: 'contain' }} />
                 ) : null}
                 {ticket.employeeStamp ? (
-                  <Image src={ticket.employeeStamp} style={{ width: 75, height: 75, objectFit: 'contain' }} />
+                  <Image src={ticket.employeeStamp} style={{ width: 220, height: 220, objectFit: 'contain' }} />
                 ) : null}
               </View>
               <Text style={styles.signatureFooterText}>Signature &amp; Validation du demandeur</Text>

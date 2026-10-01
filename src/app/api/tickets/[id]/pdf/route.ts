@@ -27,8 +27,8 @@ export async function GET(
 
     const resolvedEmployeeSignature = ticket.employeeSignature || ticket.employee?.signature || null;
     const resolvedEmployeeStamp = ticket.employeeStamp || ticket.employee?.stamp || null;
-    const resolvedTechnicianSignature = ticket.technicianSignature || ticket.technician?.signature || null;
-    const resolvedTechnicianStamp = ticket.technicianStamp || ticket.technician?.stamp || null;
+    const resolvedTechnicianSignature = ticket.technician ? (ticket.technician?.signature || ticket.technicianSignature || null) : null;
+    const resolvedTechnicianStamp = ticket.technician ? (ticket.technician?.stamp || ticket.technicianStamp || null) : null;
 
     let pdfBuffer: Buffer;
     let filename: string;

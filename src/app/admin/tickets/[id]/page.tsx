@@ -354,8 +354,8 @@ export default function TicketDetailPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setTechSig(ticket.technicianSignature || ticket.technician?.signature || null);
-                      setTechStamp(ticket.technicianStamp || ticket.technician?.stamp || null);
+                      setTechSig(ticket.technician ? (ticket.technicianSignature || ticket.technician.signature || null) : null);
+                      setTechStamp(ticket.technician ? (ticket.technicianStamp || ticket.technician.stamp || null) : null);
                       setIsSignTicketModalOpen(true);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[10px] font-bold border border-purple-500/40 transition-colors"
@@ -367,8 +367,8 @@ export default function TicketDetailPage() {
                   <div className="text-center space-y-1">
                     <span className="text-[10px] font-bold text-slate-400">توقيع التقني</span>
                     <div className="h-28 rounded-2xl bg-white p-2 flex items-center justify-center border border-slate-300 shadow-inner">
-                      {ticket.technicianSignature || ticket.technician?.signature ? (
-                        <img src={ticket.technicianSignature || ticket.technician?.signature} alt="Tech Sig" className="max-h-full max-w-full object-contain" />
+                      {ticket.technician && (ticket.technicianSignature || ticket.technician.signature) ? (
+                        <img src={(ticket.technicianSignature || ticket.technician.signature)!} alt="Tech Sig" className="max-h-full max-w-full object-contain" />
                       ) : (
                         <span className="text-[10px] text-slate-400 font-bold">غير موقع</span>
                       )}
@@ -377,8 +377,8 @@ export default function TicketDetailPage() {
                   <div className="text-center space-y-1">
                     <span className="text-[10px] font-bold text-slate-400">ختم مصلحة IT</span>
                     <div className="h-28 rounded-2xl bg-white p-2 flex items-center justify-center border border-slate-300 shadow-inner">
-                      {ticket.technicianStamp || ticket.technician?.stamp ? (
-                        <img src={ticket.technicianStamp || ticket.technician?.stamp} alt="Tech Stamp" className="max-h-full max-w-full object-contain" />
+                      {ticket.technician && (ticket.technicianStamp || ticket.technician.stamp) ? (
+                        <img src={(ticket.technicianStamp || ticket.technician.stamp)!} alt="Tech Stamp" className="max-h-full max-w-full object-contain" />
                       ) : (
                         <span className="text-[10px] text-slate-400 font-bold">بدون ختم</span>
                       )}

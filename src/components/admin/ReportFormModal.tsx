@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createReportSchema, CreateReportInput } from '@/lib/validations';
 import { createReportAction } from '@/app/actions/reports';
+import { getTechniciansAction } from '@/app/actions/technicians';
 import {
   X, FileCheck, Loader2, AlertCircle, CheckCircle2, Download,
   Printer, User, Wrench, FileText, Check, PenTool, Award
@@ -79,6 +80,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CreateReportInput>({
     resolver: zodResolver(createReportSchema),
@@ -94,6 +96,23 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
   const techNameWatch = watch('technicianName');
 
+  const [techniciansList, setTechniciansList] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    getTechniciansAction().then((res) => {
+      if (res.success && res.data) setTechniciansList(res.data);
+    });
+  }, []);
+
+  const handleTechnicianSelect = (techId: string) => {
+    const selectedTech = techniciansList.find((t) => t.id === techId);
+    if (selectedTech) {
+      setValue('technicianName', selectedTech.name);
+      setTechnicianSignature(selectedTech.signature || null);
+      setTechnicianStamp(selectedTech.stamp || null);
+    }
+  };
+
   React.useEffect(() => {
     if (ticket) {
       reset({
@@ -104,8 +123,8 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
         partsReplaced: '',
         finalStatus:   'Résolu avec succès',
       });
-      setTechnicianSignature(ticket.technicianSignature || ticket.technician?.signature || null);
-      setTechnicianStamp(ticket.technicianStamp || ticket.technician?.stamp || null);
+      setTechnicianSignature(ticket.technician?.signature || ticket.technicianSignature || null);
+      setTechnicianStamp(ticket.technician?.stamp || ticket.technicianStamp || null);
       setErrorMsg(null);
       setCreatedReportData(null);
     }
@@ -254,10 +273,26 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
               <form id="report-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 {/* Technicien */}
                 <div>
-                  <label className={labelCls}>
-                    <User className="w-3.5 h-3.5 text-sky-400" />
-                    Technicien Intervenant <span className="text-rose-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                    <label className={labelCls}>
+                      <User className="w-3.5 h-3.5 text-sky-400" />
+                      Technicien Intervenant <span className="text-rose-400">*</span>
+                    </label>
+                    {techniciansList.length > 0 && (
+                      <select
+                        onChange={(e) => handleTechnicianSelect(e.target.value)}
+                        defaultValue=""
+                        className="text-xs bg-navy-950 border border-navy-750 text-sky-300 font-bold px-2.5 py-1 rounded-xl focus:outline-none focus:border-sky-500 cursor-pointer"
+                      >
+                        <option value="" disabled>-- اختيار تقني (تحديث التوقيع والختم تلقائياً) --</option>
+                        {techniciansList.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.speciality})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                   <input
                     type="text"
                     placeholder="Ex: Sofiane Benali — Support N2"

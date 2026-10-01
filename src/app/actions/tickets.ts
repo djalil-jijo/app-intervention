@@ -48,6 +48,16 @@ export async function createTicketAction(input: CreateTicketInput & {
     const validated = createTicketSchema.parse(input);
     const ticketNumber = await generateTicketNumber();
 
+    let initialTechSig = input.technicianSignature || null;
+    let initialTechStamp = input.technicianStamp || null;
+    if (input.technicianId && (!initialTechSig || !initialTechStamp)) {
+      const tech = await prisma.technician.findUnique({ where: { id: input.technicianId } });
+      if (tech) {
+        if (!initialTechSig) initialTechSig = tech.signature || null;
+        if (!initialTechStamp) initialTechStamp = tech.stamp || null;
+      }
+    }
+
     const ticket = await prisma.interventionTicket.create({
       data: {
         ticketNumber,
@@ -71,8 +81,8 @@ export async function createTicketAction(input: CreateTicketInput & {
         employeeId:    input.employeeId || null,
         employeeSignature: input.employeeSignature || null,
         employeeStamp:     input.employeeStamp || null,
-        technicianSignature: input.technicianSignature || null,
-        technicianStamp:     input.technicianStamp || null,
+        technicianSignature: initialTechSig,
+        technicianStamp:     initialTechStamp,
         status:        TicketStatus.PENDING,
       },
     });
@@ -182,18 +192,24 @@ export async function updateTicketStatusAction(ticketId: string, status: TicketS
 
 export async function assignTechnicianToTicketAction(ticketId: string, technicianId: string | null) {
   try {
-    const ticket = await prisma.interventionTicket.findUnique({ where: { id: ticketId } });
+    const ticket = await prisma.interventionTicket.findUnique({
+      where: { id: ticketId },
+      include: { report: true },
+    });
     if (!ticket) return { success: false, error: 'Ticket introuvable' };
 
     const newStatus = (technicianId && ticket.status === 'PENDING') ? 'IN_PROGRESS' : ticket.status;
 
-    let techSig = ticket.technicianSignature;
-    let techStamp = ticket.technicianStamp;
-    if (technicianId && (!techSig || !techStamp)) {
+    let techSig: string | null = null;
+    let techStamp: string | null = null;
+    let techName: string | null = null;
+
+    if (technicianId) {
       const tech = await prisma.technician.findUnique({ where: { id: technicianId } });
       if (tech) {
-        if (!techSig && tech.signature) techSig = tech.signature;
-        if (!techStamp && tech.stamp) techStamp = tech.stamp;
+        techSig = tech.signature || null;
+        techStamp = tech.stamp || null;
+        techName = tech.name;
       }
     }
 
@@ -205,10 +221,28 @@ export async function assignTechnicianToTicketAction(ticketId: string, technicia
         technicianSignature: techSig,
         technicianStamp: techStamp,
       },
+      include: {
+        technician: true,
+        report: true,
+      },
     });
+
+    // If an intervention report already exists, update technician name and signature/stamp
+    if (ticket.report && techName) {
+      await prisma.interventionReport.update({
+        where: { id: ticket.report.id },
+        data: {
+          technicianName: techName,
+          technicianSignature: techSig,
+          technicianStamp: techStamp,
+        },
+      });
+    }
 
     revalidatePath('/admin/dashboard');
     revalidatePath('/admin/tickets');
+    revalidatePath(`/admin/tickets/${ticketId}`);
+    revalidatePath('/track');
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -223,10 +257,25 @@ export async function signTicketAsTechnicianAction(ticketId: string, signature: 
         technicianSignature: signature,
         technicianStamp: stamp,
       },
+      include: {
+        report: true,
+      },
     });
+
+    if (updated.report) {
+      await prisma.interventionReport.update({
+        where: { id: updated.report.id },
+        data: {
+          technicianSignature: signature,
+          technicianStamp: stamp,
+        },
+      });
+    }
+
     revalidatePath('/admin/dashboard');
     revalidatePath('/admin/tickets');
     revalidatePath(`/admin/tickets/${ticketId}`);
+    revalidatePath('/track');
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
